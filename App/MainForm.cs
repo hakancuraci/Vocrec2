@@ -58,8 +58,9 @@ public sealed class MainForm : Form
         browse.Click += (_, _) => { using var dialog = new FolderBrowserDialog { InitialDirectory = folder.Text, Description = "Kayıt klasörünü seçin", UseDescriptionForTitle = true }; if (dialog.ShowDialog(this) == DialogResult.OK) folder.Text = dialog.SelectedPath; };
         destination.Controls.Add(browse, 1, 1); root.Controls.Add(destination, 0, 4);
 
-        quality.Items.AddRange(["128 kb/sn — Konuşma · ~58 MB/saat", "192 kb/sn — Dengeli · ~86 MB/saat", "256 kb/sn — Yüksek kalite · ~115 MB/saat"]);
-        quality.SelectedIndex = 1;
+        quality.Items.AddRange(["128 kb/sn — Konuşma · ~58 MB/saat", "160 kb/sn — Dengeli · ~72 MB/saat", "192 kb/sn — Yüksek kalite · ~86 MB/saat"]);
+        quality.SelectedIndexChanged += (_, _) => size.Text = $"{Bitrate() / 1000} kb/sn · yaklaşık {Bitrate() * 3600 / 8_000_000d:0} MB / saat";
+        quality.SelectedIndex = 2;
         var encoding = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3 };
         encoding.Controls.Add(LabelText("SES KALİTESİ"), 0, 0); encoding.Controls.Add(quality, 0, 1);
         encoding.Controls.Add(LabelText("Tek stereo dosya • Sıkıştırarak anlık kayıt • Kayıt sırasında seviye ayarı"), 0, 2);
@@ -172,21 +173,24 @@ public sealed class MainForm : Form
     }
 
     private void SetRecording(bool value) { foreach (var control in configuration) control.Enabled = !value; start.Enabled = !value; stop.Enabled = value; }
-    private int Bitrate() => new[] { 128000, 192000, 256000 }[Math.Clamp(quality.SelectedIndex, 0, 2)];
+    private int Bitrate() => new[] { 128000, 160000, 192000 }[Math.Clamp(quality.SelectedIndex, 0, 2)];
     private static double FileSize(string path) { try { return new FileInfo(path).Length / 1_000_000d; } catch { return 0; } }
     private static int Level(RecordingSession current, bool mic) => (int)(Math.Clamp(current.Inputs.Where(i => i.Microphone == mic).Select(i => Volatile.Read(ref i.Peak)).DefaultIfEmpty().Max(), 0, 1) * 100);
     private void ShowError(Exception ex) => MessageBox.Show(this, ex.Message, "Ses Kayıt", MessageBoxButtons.OK, MessageBoxIcon.Warning);
     private void LoadSettings()
     {
         try { if (File.Exists(settingsPath)) settings = JsonSerializer.Deserialize<Settings>(File.ReadAllText(settingsPath)) ?? new(); } catch { settings = new(); }
-        folder.Text = settings.Folder; quality.SelectedIndex = Math.Clamp(settings.Quality, 0, 2);
+        folder.Text = settings.Folder;
+        // Preserve the previous 192 kb/s default when loading older index-based settings.
+        int preferredBitrate = settings.Bitrate ?? (settings.Quality == 0 ? 128000 : 192000);
+        quality.SelectedIndex = preferredBitrate switch { 128000 => 0, 160000 => 1, _ => 2 };
         systemGain.Value = Math.Clamp(settings.SystemGain, 0, 100); micGain.Value = Math.Clamp(settings.MicGain, 0, 100);
     }
     private void SaveSettings()
     {
         try
         {
-            settings = new Settings { Folder = folder.Text, Quality = quality.SelectedIndex, SystemGain = systemGain.Value, MicGain = micGain.Value,
+            settings = new Settings { Folder = folder.Text, Bitrate = Bitrate(), SystemGain = systemGain.Value, MicGain = micGain.Value,
                 Devices = outputs.CheckedItems.Cast<DeviceChoice>().Concat(microphones.CheckedItems.Cast<DeviceChoice>()).Select(d => d.Id).ToArray() };
             Directory.CreateDirectory(Path.GetDirectoryName(settingsPath)!);
             File.WriteAllText(settingsPath, JsonSerializer.Serialize(settings));
@@ -217,6 +221,7 @@ public sealed class MainForm : Form
         public Settings() { }
         public string Folder { get; set; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyMusic), "SesKayit");
         public int Quality { get; set; } = 1;
+        public int? Bitrate { get; set; }
         public int SystemGain { get; set; } = 70;
         public int MicGain { get; set; } = 70;
         public string[] Devices { get; set; } = [];

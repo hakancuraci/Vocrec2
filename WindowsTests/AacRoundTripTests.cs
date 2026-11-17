@@ -11,8 +11,8 @@ public sealed class AacRoundTripTests
     // These tests must fail, rather than silently skip, if AAC is unavailable on CI.
     [Theory]
     [InlineData(128000)]
+    [InlineData(160000)]
     [InlineData(192000)]
-    [InlineData(256000)]
     public void MixedSourcesSurviveAacRoundTrip(int bitrate)
     {
         Assert.True(OperatingSystem.IsWindows(), "Bu test Windows Media Foundation gerektirir.");

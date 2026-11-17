@@ -20,8 +20,8 @@ Ses seviyeleri kayıt sırasında değiştirilebilir. Varsayılan %70 değerleri
 | Kalite | Yaklaşık 1 saatlik boyut | Kullanım |
 | --- | --- | --- |
 | 128 kb/sn | 58 MB | Konuşma ve toplantı |
-| 192 kb/sn (varsayılan) | 86 MB | Konuşma ve müzik için dengeli |
-| 256 kb/sn | 115 MB | Müzik için daha yüksek kalite |
+| 160 kb/sn | 72 MB | Konuşma ve müzik için dengeli |
+| 192 kb/sn (varsayılan) | 86 MB | Müzik için daha yüksek kalite |
 
 Değerler ondalık MB olarak hesaplanmıştır; kapsayıcı ek yükü nedeniyle küçük farklılıklar olabilir. OBS'te benzer AAC ayarlarıyla kullanılan kodlama sınıfındadır; kaynak cihazı, mikrofon ve ortam kalitesi sonucu etkiler. Gürültü giderme, yankı engelleme veya OBS eklentileri içermez.
 
@@ -54,7 +54,7 @@ Bu klasörün **içeriğini** (`App`, `Core`, `Tests`, `WindowsTests` ve gizli `
 Her push ve pull request Windows Server 2022 üzerinde şu adımları çalıştırır:
 
 1. Mevcut 9 karıştırıcı testi çalışır.
-2. Windows Media Foundation ile 128, 192 ve 256 kb/sn için üç AAC testi çalışır. İki yapay ses kaynağı karıştırılarak ikişer saniyelik M4A dosyaları oluşturulur. Dosya yeniden açılır; stereo/48 kHz biçimi, süre, yaklaşık boyut ve iki kaynak frekansının da her iki kanalda bulunması kontrol edilir. Türkçe karakter ve boşluk içeren dosya yolu da denenir. AAC yoksa test başarısız olur; atlanmaz.
+2. Windows Media Foundation ile 128, 160 ve 192 kb/sn için üç AAC testi çalışır. İki yapay ses kaynağı karıştırılarak ikişer saniyelik M4A dosyaları oluşturulur. Dosya yeniden açılır; stereo/48 kHz biçimi, süre, yaklaşık boyut ve iki kaynak frekansının da her iki kanalda bulunması kontrol edilir. Türkçe karakter ve boşluk içeren dosya yolu da denenir. AAC yoksa test başarısız olur; atlanmaz.
 3. Testler başarılıysa Windows x64 için .NET kurulumu gerektirmeyen tek EXE hazırlanır. Yayın derlemesindeki uyarılar hata kabul edilir.
 4. EXE, kullanım kılavuzu, lisanslar, EXE'nin SHA256 özeti ve derlenen commit bilgisi **SesKayit-Windows-x64** artifact'ına eklenir. Test raporları ve yapay ses örnekleri, önceki adım başarısız olsa da **Windows-test-results** artifact'ına yüklenmeye çalışılır. Dosyalar 14 gün saklanır.
 
