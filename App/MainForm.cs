@@ -157,7 +157,7 @@ public sealed partial class MainForm : Form
         if (!devicesLoaded) previous.UnionWith(settings.Devices);
         var choices = observed.Select(d => new DeviceChoice(d.Id,
             d.Name + (d.CommunicationDefault ? "  (iletişim varsayılanı)" : ""), d.Microphone)).ToArray();
-        if (emptySources.TryGetValue(list, out var empty)) empty.Visible = choices.Length == 0;
+        if (emptySources.TryGetValue(list, out var empty)) { empty.Visible = choices.Length == 0; list.Visible = choices.Length > 0; }
         var old = list.Items.Cast<DeviceChoice>().ToArray();
         if (!old.SequenceEqual(choices))
         {

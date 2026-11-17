@@ -9,24 +9,18 @@ public sealed partial class MainForm
         SuspendLayout();
         var root = Grid(1, 4); root.Padding = new Padding(22, 4, 22, 18);
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 72));
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 80));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 94));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 108));
         Controls.Add(root);
         AddWindowChrome(); root.BringToFront();
 
-        var header = Grid(3, 1);
-        header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 56));
-        header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 205));
-        var mark = new BrandMark { Anchor = AnchorStyles.Left };
-        header.Controls.Add(mark, 0, 0);
-        var brand = Grid(1, 2); brand.RowStyles.Add(new RowStyle(SizeType.Percent, 62)); brand.RowStyles.Add(new RowStyle(SizeType.Percent, 38));
-        var name = LabelText("vocrec", 25); name.Font = new Font("Segoe UI", 25, FontStyle.Bold); name.ForeColor = StudioTheme.Ink;
-        brand.Controls.Add(name, 0, 0); brand.Controls.Add(LabelText("Sistem sesi ve mikrofon. Tek bir kayıtta.", 9), 0, 1);
-        header.Controls.Add(brand, 1, 0);
+        var header = new Panel { Dock = DockStyle.Fill, BackColor = Bg };
+        var mark = new BrandMark { Location = new Point(0, 13) }; header.Controls.Add(mark);
+        var name = Heading("vocrec", 25); name.Dock = DockStyle.None; name.Bounds = new Rectangle(56, 0, 260, 44); header.Controls.Add(name);
+        var tagline = LabelText("Sistem sesi ve mikrofon. Tek bir kayıtta.", 9); tagline.Dock = DockStyle.None; tagline.Bounds = new Rectangle(58, 45, 400, 20); header.Controls.Add(tagline);
         var tag = LabelText("SES KAYIT STÜDYOSU\n48 kHz stereo  /  AAC", 9); tag.TextAlign = ContentAlignment.MiddleRight;
-        header.Controls.Add(tag, 2, 0); root.Controls.Add(header, 0, 0);
+        tag.Dock = DockStyle.Right; tag.Width = 205; header.Controls.Add(tag); root.Controls.Add(header, 0, 0);
 
         var automationCard = new StudioCard { Dock = DockStyle.Fill, Padding = new Padding(16, 8, 16, 8), Margin = new Padding(0, 8, 0, 10) };
         var automationGrid = Grid(2, 3);
@@ -78,7 +72,7 @@ public sealed partial class MainForm
     {
         var card = new StudioCard { Dock = DockStyle.Fill, Margin = new Padding(0, 0, 0, 10), Padding = new Padding(16, 12, 16, 12) };
         var grid = Grid(1, 6);
-        foreach (int h in new[] { 27, 22, 43, 44, 34 }) grid.RowStyles.Add(new RowStyle(SizeType.Absolute, h));
+        foreach (int h in new[] { 25, 20, 40, 42, 32 }) grid.RowStyles.Add(new RowStyle(SizeType.Absolute, h));
         grid.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         grid.Controls.Add(Heading("Kayıt konumu"), 0, 0);
         grid.Controls.Add(LabelText("Ses dosyaları bu klasöre kaydedilir.", 9), 0, 1);

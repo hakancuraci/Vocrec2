@@ -91,7 +91,7 @@ internal sealed class VolumeSlider : Control
     public VolumeSlider()
     {
         SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.Selectable, true);
-        Dock = DockStyle.Fill; TabStop = true; Cursor = Cursors.Hand; BackColor = StudioTheme.Card;
+        Dock = DockStyle.Fill; TabStop = true; Cursor = Cursors.Hand; BackColor = StudioTheme.Card; Margin = new Padding(4, 0, 4, 0);
         AccessibleRole = AccessibleRole.Slider; Height = 18;
     }
     protected override void OnPaint(PaintEventArgs e)
@@ -121,7 +121,7 @@ internal sealed class LevelMeter : Control
 {
     private int value;
     public int Value { get => value; set { int next = Math.Clamp(value, 0, 100); if (this.value == next) return; this.value = next; Invalidate(); } }
-    public LevelMeter() { DoubleBuffered = true; Dock = DockStyle.Fill; Height = 7; BackColor = StudioTheme.Card; }
+    public LevelMeter() { DoubleBuffered = true; Dock = DockStyle.Fill; Height = 7; BackColor = StudioTheme.Card; Margin = Padding.Empty; }
     protected override void OnPaint(PaintEventArgs e)
     {
         for (int n = 0; n < 30; n++)
@@ -140,7 +140,7 @@ internal sealed class DevicePicker : ListBox
     {
         Dock = DockStyle.Fill; BackColor = StudioTheme.Card; ForeColor = StudioTheme.Ink;
         BorderStyle = BorderStyle.None; IntegralHeight = false; DrawMode = DrawMode.OwnerDrawFixed; ItemHeight = 28;
-        Font = new Font("Segoe UI", 9); AccessibleName = "Ses kaynakları";
+        Font = new Font("Segoe UI", 9); AccessibleName = "Ses kaynakları"; Margin = Padding.Empty;
     }
     public void SetItemChecked(int index, bool selected)
     {
@@ -195,10 +195,10 @@ internal sealed class StudioSwitch : CheckBox
 
 internal sealed class BrandMark : Control
 {
-    public BrandMark() { DoubleBuffered = true; Size = new Size(42, 42); }
+    public BrandMark() { DoubleBuffered = true; Size = new Size(42, 42); BackColor = StudioTheme.Background; }
     protected override void OnPaint(PaintEventArgs e)
     {
-        var g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias;
+        var g = e.Graphics; g.Clear(StudioTheme.Surface(Parent)); g.SmoothingMode = SmoothingMode.AntiAlias;
         using var shape = StudioTheme.Round(new RectangleF(1, 1, Width - 2, Height - 2), 11);
         using var fill = new SolidBrush(StudioTheme.Purple); g.FillPath(fill, shape);
         using var pen = new Pen(StudioTheme.Background, 3) { StartCap = LineCap.Round, EndCap = LineCap.Round };
@@ -213,7 +213,7 @@ internal sealed class ActivityFeed : ListBox
     {
         Dock = DockStyle.Fill; BackColor = StudioTheme.Card; ForeColor = StudioTheme.Muted;
         BorderStyle = BorderStyle.None; IntegralHeight = false; DrawMode = DrawMode.OwnerDrawFixed; ItemHeight = 26;
-        Font = new Font("Segoe UI", 9); SelectionMode = SelectionMode.None;
+        Font = new Font("Segoe UI", 9); SelectionMode = SelectionMode.None; Margin = Padding.Empty;
     }
     protected override void OnDrawItem(DrawItemEventArgs e)
     {
