@@ -7,7 +7,7 @@ namespace SesKayit;
 public sealed class MainForm : Form
 {
     private static readonly Color Bg = Color.FromArgb(17, 23, 35), PanelBg = Color.FromArgb(27, 36, 52);
-    private readonly CheckBox automatic = new() { Text = "Otomatik kaynak seçimi\nTeams’te sessize almak yerel mikrofon kaydını durdurmaz.", Checked = true, Dock = DockStyle.Fill };
+    private readonly CheckBox automatic = new() { Text = "Otomatik kaynak seçimi · Teams’te sessize almak yerel mikrofon kaydını durdurmaz.", Checked = true, Dock = DockStyle.Fill };
     private readonly ListBox outputApps = ActivityList(), micApps = ActivityList();
     private readonly System.Windows.Forms.Timer discoveryTimer = new() { Interval = 1000 };
     private bool scanning, devicesLoaded;
@@ -33,14 +33,18 @@ public sealed class MainForm : Form
         Text = "Ses Kayıt · Sistem + Mikrofon";
         BackColor = Bg; ForeColor = Color.White; Font = new Font("Segoe UI", 10);
         MinimumSize = new Size(820, 800); Size = new Size(1000, 1000); StartPosition = FormStartPosition.CenterScreen;
-        var root = new TableLayoutPanel { Dock = DockStyle.Top, Height = 1040, Padding = new Padding(28), ColumnCount = 1, RowCount = 10 };
+        var root = new TableLayoutPanel { Dock = DockStyle.Top, Height = 920, Padding = new Padding(28), ColumnCount = 1, RowCount = 8 };
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 50));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 52));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 40));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        foreach (int height in new[] { 92, 74, 95, 55, 60, 60 }) root.RowStyles.Add(new RowStyle(SizeType.Absolute, height));
+        foreach (int height in new[] { 92, 74, 95, 55 }) root.RowStyles.Add(new RowStyle(SizeType.Absolute, height));
         var scroll = new Panel { Dock = DockStyle.Fill, AutoScroll = true };
         scroll.Controls.Add(root); Controls.Add(scroll);
+        var bottom = new TableLayoutPanel { Dock = DockStyle.Bottom, Height = 120, Padding = new Padding(28, 0, 28, 8), ColumnCount = 1, RowCount = 2 };
+        bottom.RowStyles.Add(new RowStyle(SizeType.Absolute, 60));
+        bottom.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        Controls.Add(bottom); scroll.BringToFront();
         root.Controls.Add(LabelText("SES KAYIT", 25), 0, 0);
         root.Controls.Add(LabelText("Bilgisayarın sesi ve mikrofonların, tek bir kayıtta.\nWindows WASAPI  /  48 kHz stereo  /  AAC (.m4a)"), 0, 1);
 
@@ -79,9 +83,9 @@ public sealed class MainForm : Form
         var actions = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false };
         start.BackColor = Color.FromArgb(32, 131, 105); start.Width = 175; stop.Width = 185; stop.Enabled = false;
         var refresh = MakeButton("Cihazları yenile"); var open = MakeButton("Klasörü aç");
-        actions.Controls.AddRange([start, stop, refresh, open]); root.Controls.Add(actions, 0, 8);
+        actions.Controls.AddRange([start, stop, refresh, open]); bottom.Controls.Add(actions, 0, 0);
         var footer = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2 };
-        footer.Controls.Add(status); footer.Controls.Add(peakInfo); root.Controls.Add(footer, 0, 9);
+        footer.Controls.Add(status); footer.Controls.Add(peakInfo); bottom.Controls.Add(footer, 0, 1);
         configuration.AddRange([automatic, folder, browse, quality, refresh]);
 
         LoadSettings();
