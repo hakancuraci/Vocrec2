@@ -1,0 +1,28 @@
+name: Windows app screenshot
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  screenshot:
+    runs-on: windows-2022
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Render the production Windows form
+        timeout-minutes: 2
+        shell: pwsh
+        run: dotnet run --project Screenshot/SesKayit.Screenshot.csproj -c Release -- artifacts/SesKayit.png
+      - name: Upload screenshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: SesKayit-Screenshot
+          path: artifacts/SesKayit.png
+          if-no-files-found: error
+          retention-days: 14
