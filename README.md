@@ -8,8 +8,8 @@ Windows 10/11 x64 için, bilgisayar çıkışlarını ve mikrofonları aynı and
 2. `SesKayit.exe` dosyasını açın. .NET kurulumu veya yönetici yetkisi gerekmez.
 3. Varsayılan **Otomatik kaynak seçimi** açıkken tüm ses çıkışları, Windows iletişim mikrofonu ve diğer uygulamaların kullandığı mikrofonlar seçilir. Elle seçim yapmak için otomatik modu kapatın. **Bilgisayar sesi** bölümünde YouTube, Teams vb. uygulamaların ses verdiği çıkışları işaretleyin. Teams kulaklığa, YouTube hoparlöre ses veriyorsa ikisini de seçin.
 4. **Mikrofonlar** bölümünde kaydedilecek mikrofonları seçin. Birden fazla çıkış ve mikrofon aynı anda seçilebilir.
-5. Kayıt klasörünü ve kaliteyi seçip **Kaydı başlat** düğmesine basın.
-6. **Durdur ve kaydet** düğmesine bastığınızda son ses tamponları işlenir ve dosya tamamlanır. **Klasörü aç** ile ulaşabilirsiniz. Pencereyi kapatmak da sürmekte olan kaydı tamamlar.
+5. Sağdaki **Kayıt konumu** kartında mevcut adresi görebilirsiniz. **Kayıt klasörünü değiştir** düğmesi yeni kayıtların kaydedileceği klasörü seçer. **Klasörü görüntüle** yalnızca bu adresi Dosya Gezgini'nde açar; kayıt yerini değiştirmez. Klasör seçimi hemen saklanır.
+6. Kaliteyi seçip **Kaydı başlat** düğmesine basın. **Kaydı bitir** düğmesine bastığınızda son ses tamponları işlenir ve dosya tamamlanır. Pencereyi kapatmak da sürmekte olan kaydı tamamlar.
 
 Ses seviyeleri kayıt sırasında değiştirilebilir. Varsayılan %70 değerleri karışımda taşmayı azaltır. Tepe sınırı uyarısı çıkarsa seviyeleri düşürün. Göstergeler yalnızca kayıt sırasında çalışır. Klasör, kalite, cihaz seçimi ve seviyeler sonraki açılış için saklanır.
 

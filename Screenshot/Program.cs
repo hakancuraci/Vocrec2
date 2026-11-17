@@ -27,12 +27,19 @@ internal static class Program
             {
                 form.PerformLayout();
                 form.Refresh();
+                CheckImportantControls(form);
                 using var bitmap = new Bitmap(form.Width, form.Height);
                 // Native WinForms rendering also works on a runner without a visible desktop.
                 form.DrawToBitmap(bitmap, new Rectangle(Point.Empty, bitmap.Size));
                 Directory.CreateDirectory(Path.GetDirectoryName(path)!);
                 bitmap.Save(path, ImageFormat.Png);
                 Console.WriteLine($"Rendered production MainForm: {bitmap.Width}x{bitmap.Height} -> {path}");
+                form.Size = form.MinimumSize;
+                form.PerformLayout(); form.Refresh();
+                CheckImportantControls(form);
+                using var compact = new Bitmap(form.Width, form.Height);
+                form.DrawToBitmap(compact, new Rectangle(Point.Empty, compact.Size));
+                compact.Save(Path.Combine(Path.GetDirectoryName(path)!, "SesKayit-compact.png"), ImageFormat.Png);
                 result = 0;
             }
             catch (Exception ex) { Console.Error.WriteLine(ex); }
@@ -41,5 +48,29 @@ internal static class Program
         form.Shown += (_, _) => captureTimer.Start();
         Application.Run(form);
         return result;
+    }
+
+    private static void CheckImportantControls(Form form)
+    {
+        Control[] controls = Descendants(form).ToArray();
+        foreach (string text in new[] { "Kayıt klasörünü değiştir", "Klasörü görüntüle", "●  Kaydı başlat", "■  Kaydı bitir" })
+        {
+            var control = controls.Single(c => c is Button && c.Text == text);
+            var bounds = form.RectangleToClient(control.RectangleToScreen(control.ClientRectangle));
+            if (!control.Visible || !form.ClientRectangle.Contains(bounds))
+                throw new InvalidOperationException($"Important action is outside the visible window: {text}");
+        }
+        var folder = controls.Single(c => c.AccessibleName == "Seçili kayıt klasörü");
+        if (!folder.Visible || !form.ClientRectangle.Contains(form.RectangleToClient(folder.RectangleToScreen(folder.ClientRectangle))))
+            throw new InvalidOperationException("Recording folder must stay visible without scrolling.");
+    }
+
+    private static IEnumerable<Control> Descendants(Control parent)
+    {
+        foreach (Control child in parent.Controls)
+        {
+            yield return child;
+            foreach (var nested in Descendants(child)) yield return nested;
+        }
     }
 }
