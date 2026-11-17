@@ -6,12 +6,22 @@ Windows 10/11 x64 için, bilgisayar çıkışlarını ve mikrofonları aynı and
 
 1. `SesKayit-Windows-x64.zip` arşivini bir klasöre çıkartın.
 2. `SesKayit.exe` dosyasını açın. .NET kurulumu veya yönetici yetkisi gerekmez.
-3. **Bilgisayar sesi** bölümünde YouTube, Teams vb. uygulamaların ses verdiği çıkışları işaretleyin. Teams kulaklığa, YouTube hoparlöre ses veriyorsa ikisini de seçin.
+3. Varsayılan **Otomatik kaynak seçimi** açıkken tüm ses çıkışları, Windows iletişim mikrofonu ve diğer uygulamaların kullandığı mikrofonlar seçilir. Elle seçim yapmak için otomatik modu kapatın. **Bilgisayar sesi** bölümünde YouTube, Teams vb. uygulamaların ses verdiği çıkışları işaretleyin. Teams kulaklığa, YouTube hoparlöre ses veriyorsa ikisini de seçin.
 4. **Mikrofonlar** bölümünde kaydedilecek mikrofonları seçin. Birden fazla çıkış ve mikrofon aynı anda seçilebilir.
 5. Kayıt klasörünü ve kaliteyi seçip **Kaydı başlat** düğmesine basın.
 6. **Durdur ve kaydet** düğmesine bastığınızda son ses tamponları işlenir ve dosya tamamlanır. **Klasörü aç** ile ulaşabilirsiniz. Pencereyi kapatmak da sürmekte olan kaydı tamamlar.
 
 Ses seviyeleri kayıt sırasında değiştirilebilir. Varsayılan %70 değerleri karışımda taşmayı azaltır. Tepe sınırı uyarısı çıkarsa seviyeleri düşürün. Göstergeler yalnızca kayıt sırasında çalışır. Klasör, kalite, cihaz seçimi ve seviyeler sonraki açılış için saklanır.
+
+## Canlı kanallar ve otomatik algılama
+
+- Kanal listelerinin altında Windows ses oturumlarının uygulama adları görünür. Örneğin Teams `ms-teams`, YouTube ise `chrome`, `msedge` veya kullandığınız tarayıcının adıyla görünebilir; sekme/site adı her zaman belirlenemez.
+- `ses var` o anda ölçülen ses seviyesini; `oturum açık · ses yok` uygulamanın açık ses oturumunu; `mikrofonu kullanıyor · ses yok` başka uygulamanın sessiz mikrofon oturumunu belirtir. Bu bilgiler yaklaşık her saniye yenilenir; çok kısa sesler göstergede kaçabilir fakat seçili kaynakta kayıt devam eder.
+- Uygulama kendi kayıt oturumunu başka uygulamanın mikrofon kullanımı olarak saymaz. Kayıt başlamadan yapılan oturum taraması mikrofon sesini açıp dinlemez.
+- **Teams’in yazılımsal sessiz düğmesi evrensel Windows API’leriyle güvenilir biçimde belirlenemez. Teams’te sessize almak bu uygulamanın mikrofon kaydını durdurmaz.** Yerel kaydı susturmak için mikrofon seviyesini %0 yapın veya kayıttan önce elle modda mikrofonu kaldırın.
+- Otomatik modda varsayılan iletişim mikrofonu konuşma başlamadan kayda hazırdır. Diğer uygulamalar mikrofonlarını açık tuttuğunda, konuşmasalar bile `kullanılıyor` olarak görünebilir. Seçim ses eşiğine bağlanmaz; sessiz konuşmalar ve ilk hece korunur.
+- Kaynaklar otomatik seçilir, ancak kayıt yine **Kaydı başlat** düğmesiyle başlar. Uygulama açılışında kendi kendine kayıt başlatmaz. Uygulama listesi bilgilendirme içindir; uygulamaya özel ayrı ses yakalama yapılmaz.
+- Bazı sürücüler/korumalı oturumlar uygulama bilgisi vermeyebilir. Oturum bilgisi okunamıyorsa uyarı gösterilir; elle cihaz seçimi kullanılabilir.
 
 ## Kalite ve boyut
 
@@ -30,7 +40,7 @@ Değerler ondalık MB olarak hesaplanmıştır; kapsayıcı ek yükü nedeniyle 
 - Her işaretli çıkışın **tüm sesi** alınır. Uygulama bazlı ayırma yapılmaz. Aynı çıkıştaki YouTube ve Teams birlikte kaydedilir. Windows ses mikserinden uygulamaların çıkışını kontrol edin.
 - Kaynaklar tek stereo dosyada birleştirilir; ayrı düzenlenebilir çok kanallı iz dosyaları üretilmez. Çok kanallı hoparlör çıkışları stereo olarak birleştirilir.
 - Farklı örnekleme hızları 48 kHz'e dönüştürülür. Bağımsız cihaz saatleri donanımsal olarak senkron değildir; uzun kayıtlardaki kayma ve cihaz gecikmeleri Windows üzerinde ayrıca doğrulanmalıdır.
-- Yeni bağlanan cihaz için **Cihazları yenile** düğmesini kullanın. Kayıt boyunca cihaz seçimi sabittir. Bir cihaz kaybolursa kayıt durdurulur ve hata gösterilir; tamamlanan bölüm kaydedilmeye çalışılır.
+- **Otomatik mod:** Kaynaklar yaklaşık her saniye taranır; kayıt sırasında bağlanan çıkışlar, değişen varsayılan iletişim mikrofonu ve başka uygulamaların açtığı mikrofonlar kayda eklenir. Çıkarılan cihazlar kayıttan kaldırılır; kalan kaynaklar aynı dosyaya devam eder. Tüm kaynaklar kaybolursa dosyaya sessizlik yazılır ve yeniden bağlananlar eklenir. Yeni bir cihazdaki ilk yaklaşık bir saniyelik ses kaçabilir. **Elle mod:** Seçim kayıt süresince sabittir; cihaz kaybında kayıt hata ile durur.
 - Aynı fiziksel sesi hem sanal bir çıkıştan hem gerçek çıkıştan yakalamak çift sese neden olabilir. Hoparlör sesinin mikrofona da girmesini azaltmak için kulaklık kullanın.
 - Windows Ayarları → Gizlilik ve güvenlik → Mikrofon bölümünde masaüstü uygulamalarına mikrofon erişimini açın. Windows N sürümlerinde AAC için Media Feature Pack gerekebilir. Korumalı içerikler veya özel sürücüler loopback yakalamayı engelleyebilir.
 - Kaydederken uygulamayı zorla kapatmayın; uykuya geçmeyin veya ses cihazını değiştirmeyin. Tamamlanmamış dosyalar `.partial.m4a` adıyla kalır; çökme veya disk hatası sonrasında oynatılabilecekleri garanti edilmez. Başarılı kapanışta dosya normal `.m4a` adına çevrilir.
@@ -53,7 +63,7 @@ Bu klasörün **içeriğini** (`App`, `Core`, `Tests`, `WindowsTests` ve gizli `
 
 Her push ve pull request Windows Server 2022 üzerinde şu adımları çalıştırır:
 
-1. Mevcut 9 karıştırıcı testi çalışır.
+1. Karıştırıcı, dinamik kaynak değiştirme ve otomatik seçim testleri çalışır.
 2. Windows Media Foundation ile 128, 160 ve 192 kb/sn için üç AAC testi çalışır. İki yapay ses kaynağı karıştırılarak ikişer saniyelik M4A dosyaları oluşturulur. Dosya yeniden açılır; stereo/48 kHz biçimi, süre, yaklaşık boyut ve iki kaynak frekansının da her iki kanalda bulunması kontrol edilir. Türkçe karakter ve boşluk içeren dosya yolu da denenir. AAC yoksa test başarısız olur; atlanmaz.
 3. Testler başarılıysa Windows x64 için .NET kurulumu gerektirmeyen tek EXE hazırlanır. Yayın derlemesindeki uyarılar hata kabul edilir.
 4. EXE, kullanım kılavuzu, lisanslar, EXE'nin SHA256 özeti ve derlenen commit bilgisi **SesKayit-Windows-x64** artifact'ına eklenir. Test raporları ve yapay ses örnekleri, önceki adım başarısız olsa da **Windows-test-results** artifact'ına yüklenmeye çalışılır. Dosyalar 14 gün saklanır.

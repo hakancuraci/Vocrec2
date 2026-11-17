@@ -14,7 +14,9 @@ public sealed class MixerInput(ISampleProvider source, bool microphone)
 public sealed class AudioMixer : IWaveProvider, IDisposable
 {
     public const int Rate = 48000;
-    private readonly MixerInput[] inputs;
+    private MixerInput[] inputs;
+    private readonly object graphLock = new();
+    public MixerInput[] CurrentInputs { get { lock (graphLock) return inputs.ToArray(); } }
     private readonly ManualResetEventSlim ended = new(false);
     private readonly Stopwatch clock = new();
     private readonly float[] sum = new float[1920];
@@ -33,6 +35,15 @@ public sealed class AudioMixer : IWaveProvider, IDisposable
         if (this.inputs.Length == 0) throw new ArgumentException("En az bir ses kaynağı seçin.");
         if (this.inputs.Any(i => i.Source.WaveFormat.SampleRate != Rate || i.Source.WaveFormat.Channels != 2))
             throw new ArgumentException("Kaynaklar 48 kHz stereo olmalıdır.");
+    }
+
+    // Swapping under the read lock lets the caller dispose removed devices safely.
+    public void SetInputs(IEnumerable<MixerInput> sources)
+    {
+        var next = sources.ToArray();
+        if (next.Any(i => i.Source.WaveFormat.SampleRate != Rate || i.Source.WaveFormat.Channels != 2))
+            throw new ArgumentException("Kaynaklar 48 kHz stereo olmalıdır.");
+        lock (graphLock) inputs = next;
     }
 
     public int Read(byte[] buffer, int offset, int count)
@@ -59,6 +70,11 @@ public sealed class AudioMixer : IWaveProvider, IDisposable
     }
 
     private void Mix(int samples)
+    {
+        lock (graphLock) MixLocked(samples);
+    }
+
+    private void MixLocked(int samples)
     {
         Array.Clear(sum, 0, samples);
         foreach (var input in inputs)

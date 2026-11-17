@@ -88,6 +88,58 @@ public class MixerTests
     }
 
     [Fact]
+    public void CanReplaceDevicesAndKeepWritingSilenceWhileAllAreUnplugged()
+    {
+        using var mixer = new AudioMixer([new(new Constant(0.2f), false)]) { SystemGain = 1 };
+        byte[] pcm = new byte[192];
+        mixer.Read(pcm, 0, pcm.Length);
+        Assert.InRange(BitConverter.ToInt16(pcm), 6552, 6555);
+        mixer.SetInputs([]);
+        mixer.Read(pcm, 0, pcm.Length);
+        Assert.All(pcm, b => Assert.Equal(0, b));
+        mixer.SetInputs([new(new Constant(0.4f), false)]);
+        mixer.Read(pcm, 0, pcm.Length);
+        Assert.InRange(BitConverter.ToInt16(pcm), 13105, 13108);
+        Assert.Equal(TimeSpan.FromMilliseconds(3), mixer.Duration);
+    }
+
+    private sealed class BlockingSource : ISampleProvider
+    {
+        public WaveFormat WaveFormat { get; } = WaveFormat.CreateIeeeFloatWaveFormat(48000, 2);
+        public readonly ManualResetEventSlim Entered = new(false), Release = new(false);
+        public bool Removed;
+        public int Read(float[] buffer, int offset, int count)
+        {
+            Assert.False(Removed);
+            Entered.Set();
+            Assert.True(Release.Wait(TimeSpan.FromSeconds(5)));
+            Array.Clear(buffer, offset, count);
+            return count;
+        }
+    }
+
+    [Fact]
+    public async Task DeviceSwapWaitsUntilOldSourceHasFinishedReading()
+    {
+        var source = new BlockingSource();
+        using var mixer = new AudioMixer([new(source, false)]) { SystemGain = 1 };
+        byte[] pcm = new byte[192];
+        var read = Task.Factory.StartNew(() => mixer.Read(pcm, 0, pcm.Length), CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+        Assert.True(source.Entered.Wait(TimeSpan.FromSeconds(5)));
+        using var replacing = new ManualResetEventSlim();
+        var swap = Task.Factory.StartNew(() => { replacing.Set(); mixer.SetInputs([new(new Constant(0.4f), false)]); }, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+        Assert.True(replacing.Wait(TimeSpan.FromSeconds(5)));
+        try { await Task.Delay(30); Assert.False(swap.IsCompleted); }
+        finally { source.Release.Set(); }
+        await read.WaitAsync(TimeSpan.FromSeconds(5));
+        await swap.WaitAsync(TimeSpan.FromSeconds(5));
+        source.Removed = true;
+        mixer.Read(pcm, 0, pcm.Length);
+        Assert.InRange(BitConverter.ToInt16(pcm), 13105, 13108);
+        source.Entered.Dispose(); source.Release.Dispose();
+    }
+
+    [Fact]
     public void RejectsUnconvertedSourcesAndEmptySelection()
     {
         Assert.Throws<ArgumentException>(() => new AudioMixer([]));
