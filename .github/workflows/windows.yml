@@ -1,0 +1,92 @@
+name: Windows build and audio tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    name: Test and package Windows x64
+    runs-on: windows-2022
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+      SESKAYIT_TEST_AUDIO_DIR: ${{ github.workspace }}/TestResults/audio
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Test mixer
+        run: >-
+          dotnet test Tests/SesKayit.Tests.csproj -c Release
+          --logger "trx;LogFileName=mixer.trx"
+          --results-directory TestResults/mixer
+          --blame-hang-timeout 2m
+
+      - name: Test Windows AAC encoding and decoding
+        run: >-
+          dotnet test WindowsTests/SesKayit.WindowsTests.csproj -c Release
+          --logger "trx;LogFileName=windows-aac.trx"
+          --results-directory TestResults/windows
+          --blame-hang-timeout 2m
+
+      - name: Publish standalone EXE
+        run: >-
+          dotnet publish App/SesKayit.csproj -c Release -r win-x64
+          --self-contained true
+          -p:PublishSingleFile=true
+          -p:EnableCompressionInSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:DebugType=None -p:DebugSymbols=false
+          -warnaserror -o dist/win-x64
+
+      - name: Prepare download package
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $package = New-Item -ItemType Directory -Force dist/package
+          Copy-Item dist/win-x64/SesKayit.exe $package
+          Copy-Item README.md, LICENSE, NAudio-LICENSE.txt $package
+          Copy-Item Licenses $package -Recurse
+          $hash = (Get-FileHash dist/package/SesKayit.exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  SesKayit.exe" | Set-Content dist/package/SHA256SUMS.txt -Encoding utf8
+          @"
+          Commit: $env:GITHUB_SHA
+          Runner: windows-2022
+          Mixer and Windows AAC round-trip tests passed.
+          Physical microphone/loopback devices and desktop UI were not tested.
+          "@ | Set-Content dist/package/BUILD-INFO.txt -Encoding utf8
+
+      - name: Upload Windows download
+        uses: actions/upload-artifact@v4
+        with:
+          name: SesKayit-Windows-x64
+          path: dist/package/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload test reports and synthetic audio
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Windows-test-results
+          path: TestResults/
+          if-no-files-found: warn
+          retention-days: 14

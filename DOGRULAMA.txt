@@ -1,0 +1,8 @@
+Yerel doğrulama (Linux):
+- Windows x64 Release EXE önceden derlendi.
+- Karıştırıcı testleri: 9 başarılı, 0 başarısız.
+- Yeni WindowsTests projesi: 0 hata, 0 uyarı ile derlendi.
+- GitHub Actions workflow: actionlint ve dosya yolu kontrolleri başarılı.
+- Üç Windows AAC entegrasyon testi Linux üzerinde çalıştırılmadı.
+- Güncel Windows CI sonucu için GitHub Actions çalışma sayfasını kontrol edin.
+- Gerçek mikrofon/loopback ve arayüz testleri yerel Windows gerektirir.
