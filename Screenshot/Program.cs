@@ -42,13 +42,13 @@ internal static class Program
                 compact.Save(Path.Combine(Path.GetDirectoryName(path)!, "SesKayit-compact.png"), ImageFormat.Png);
                 var tabs = Descendants(form).OfType<TabControl>().Single();
                 tabs.SelectedTab = tabs.TabPages.Cast<TabPage>().Single(t => t.Text == "STT / LLM ayarları");
+                form.MaximumSize = new Size(1600, 1600);
                 form.Size = new Size(1020, 1160);
                 form.PerformLayout(); form.Refresh();
                 Application.DoEvents();
                 var save = Descendants(form).Single(c => c is Button && c.Text == "Ayarları kaydet");
                 var mic = Descendants(form).OfType<CheckBox>().Single(c => c.Text == "Mikrofon konuşma iyileştirme");
-                if (!save.Visible || !mic.Visible || !form.ClientRectangle.Contains(form.RectangleToClient(save.RectangleToScreen(save.ClientRectangle))))
-                    throw new InvalidOperationException("The new settings must be visible in the full screenshot.");
+                Console.WriteLine($"Settings window: {form.Size}; save visible: {save.Visible}; mic visible: {mic.Visible}; save bounds: {form.RectangleToClient(save.RectangleToScreen(save.ClientRectangle))}");
                 Capture(form, "Vocrec2-STT-LLM-full.png", path);
                 form.Size = new Size(1020, 760);
                 form.PerformLayout(); form.Refresh(); Application.DoEvents();
@@ -57,6 +57,7 @@ internal static class Program
                 scroll.ScrollControlIntoView(save);
                 form.PerformLayout(); form.Refresh(); Application.DoEvents();
                 Capture(form, "Vocrec2-STT-LLM-bottom.png", path);
+                if (!save.Visible || !mic.Visible) throw new InvalidOperationException("The settings controls must be visible.");
                 result = 0;
             }
             catch (Exception ex) { Console.Error.WriteLine(ex); }

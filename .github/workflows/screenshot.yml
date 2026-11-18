@@ -24,6 +24,7 @@ jobs:
         shell: pwsh
         run: dotnet run --project Screenshot/SesKayit.Screenshot.csproj -c Release -- artifacts/SesKayit.png
       - name: Upload screenshot
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: Vocrec2-Screenshots
