@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Drawing.Drawing2D;
 
 namespace SesKayit;
@@ -7,6 +8,7 @@ internal sealed class StudioChoice : Control
     private int selectedIndex = -1;
     public List<object> Items { get; } = [];
     public event EventHandler? SelectedIndexChanged;
+    [DefaultValue(-1)]
     public int SelectedIndex
     {
         get => selectedIndex;

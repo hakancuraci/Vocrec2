@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Drawing.Drawing2D;
 
 namespace SesKayit;
@@ -51,8 +52,11 @@ internal sealed class StudioCard : Panel
 
 internal sealed class StudioButton : Button
 {
+    [DefaultValue(false)]
     public bool Primary { get; set; }
+    [DefaultValue(false)]
     public bool Accent { get; set; }
+    [DefaultValue(false)]
     public bool Selected { get; set; }
     private bool hovered;
     public StudioButton()
@@ -84,6 +88,7 @@ internal sealed class VolumeSlider : Control
     private int value = 70;
     private bool dragging;
     public event EventHandler? ValueChanged;
+    [DefaultValue(70)]
     public int Value
     {
         get => value;
@@ -121,6 +126,7 @@ internal sealed class VolumeSlider : Control
 internal sealed class LevelMeter : Control
 {
     private int value;
+    [DefaultValue(0)]
     public int Value { get => value; set { int next = Math.Clamp(value, 0, 100); if (this.value == next) return; this.value = next; Invalidate(); } }
     public LevelMeter() { DoubleBuffered = true; Dock = DockStyle.Fill; Height = 7; BackColor = StudioTheme.Card; Margin = Padding.Empty; }
     protected override void OnPaint(PaintEventArgs e)
@@ -175,6 +181,7 @@ internal sealed class DevicePicker : ListBox
 
 internal sealed class StudioSwitch : CheckBox
 {
+    [DefaultValue("Elle")]
     public string OffText { get; set; } = "Elle";
     public StudioSwitch()
     {

@@ -7,3 +7,5 @@ The original TrsLocal.Core project reference is adjusted for this directory layo
 
 Model weights are not included and retain their separate upstream license.
 89cbb008e53e3c7a65d5af1bf0073716be50c925
+
+Vocrec2 adaptation: project targets changed to net9.0 for .NET 9 SDK builds.

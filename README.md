@@ -34,18 +34,18 @@ Bu, yankı giderme veya kaynak ayırma modeli değildir. Konuşma sırasında y�
 
 ## Derleme ve test
 
-Windows x64 üzerinde **.NET 8 SDK** (8.0.100 veya daha yeni bir 8.0.x sürümü) yeterlidir. .NET 11 gerekmez. Visual Studio kullanıyorsanız Visual Studio 2022 17.8 veya üzeri ve “.NET masaüstü geliştirme” iş yükü gerekir. Yalnız Runtime kurulumu kaynak kodu derlemek için yeterli değildir.
+Windows x64 üzerinde **.NET 9 SDK** gerekir. .NET 8 kurulumu gerekmez. Ekran görüntünüzdeki **9.0.317** SDK ile derleme desteklenir. `global.json`, kurulu kararlı 9.0.x SDK'yı seçer; 10/11'e geçmez. Tüm projeler `net9.0` / `net9.0-windows` hedefler; kaynak C# 12 kullanmaya devam eder.
 
-Depo kökündeki `global.json`, kurulu en yeni **8.0.x** SDK'yı seçer; 9/10/11'e geçmez. Önceki 8.0.4xx kısıtı kaldırılmıştır. Visual Studio'nun da bilgisayarınızdaki SDK sürümünü desteklemesi gerekir (örneğin 8.0.4xx için VS 17.11+); komut satırından derleme için Visual Studio gerekmez.
+Visual Studio kullanıyorsanız SDK 9.0.3xx için **Visual Studio 2022 17.14+** ve “.NET masaüstü geliştirme” iş yükü gerekir. Visual Studio güncellenemiyorsa mevcut .NET 9 SDK ile PowerShell'den derleyebilirsiniz; komut satırı derlemesi Visual Studio gerektirmez.
 
-Komutları `Vocrec.sln` ve `global.json` dosyalarının bulunduğu depo kökünde çalıştırın:
+Komutları güncel `Vocrec.sln` ve `global.json` dosyalarının bulunduğu depo kökünde çalıştırın:
 
 ```powershell
 dotnet --list-sdks
 dotnet --version
 ```
 
-`dotnet --version` çıktısı `8.0.x` olmalıdır. Projeler `net8.0` / `net8.0-windows` hedefler ve C# 12 kullanır. `NETSDK1141` hatası, `global.json` ile eşleşen SDK bulunamadığını belirtir; güncel dosyayı kullanın ve listede .NET 8 SDK bulunduğundan emin olun.
+`dotnet --version` çıktısı `9.0.x` olmalıdır. Eski ZIP'teki `global.json` dosyasını kullanmayın. Yalnız SDK ayarı değil, proje hedefleri de güncellendiği için güncel kaynak kodu bütün olarak indirin. `NETSDK1141`, `global.json` ile eşleşen SDK bulunamadığını belirtir.
 
 Derleme ve test:
 
