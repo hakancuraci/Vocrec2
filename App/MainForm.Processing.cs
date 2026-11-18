@@ -13,6 +13,7 @@ public sealed partial class MainForm
     private string PendingDirectory => Path.Combine(Path.GetDirectoryName(settingsPath)!, "pending");
     private sealed record PendingJob(string Audio, PostProcessingSettings Settings);
     private Task processingTask = Task.CompletedTask;
+    private bool updatingPromptScroll;
 
     private Control ProcessingCard()
     {
@@ -107,9 +108,25 @@ public sealed partial class MainForm
         grid.Controls.Add(field, 0, 1); configuration.Add(input); return grid;
     }
 
+    private void UpdatePromptScrollBars()
+    {
+        if (updatingPromptScroll || !llmPrompt.IsHandleCreated) return;
+        updatingPromptScroll = true;
+        try
+        {
+            int lines = llmPrompt.GetLineFromCharIndex(llmPrompt.TextLength) + 1;
+            int visible = Math.Max(1, llmPrompt.ClientSize.Height / llmPrompt.Font.Height);
+            llmPrompt.ScrollBars = lines > visible ? ScrollBars.Vertical : ScrollBars.None;
+        }
+        finally { updatingPromptScroll = false; }
+    }
+
     private void InitializeProcessingControls()
     {
         Shown += (_, _) => ResumePending(useCurrentSettings: false);
+        llmPrompt.HandleCreated += (_, _) => UpdatePromptScrollBars();
+        llmPrompt.SizeChanged += (_, _) => UpdatePromptScrollBars();
+        llmPrompt.TextChanged += (_, _) => UpdatePromptScrollBars();
         foreach (var field in new[] { transcriptFolder, summaryFolder, llmUrl, llmModel, llmPrompt, llmBearerToken })
             field.TextChanged += (_, _) => { processingSaveState.Text = "Değişiklikleri uygulamak için kaydedin."; processingSaveState.ForeColor = StudioTheme.Muted; };
         enhanceMic.CheckedChanged += (_, _) => processingSaveState.Text = "Değişiklikleri uygulamak için kaydedin.";
