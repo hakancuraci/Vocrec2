@@ -82,7 +82,8 @@ jobs:
           Copy-Item dist/win-x64/* $package -Recurse
           New-Item -ItemType Directory -Force "$package/models/balbal-v2-manas" | Out-Null
           Copy-Item README.md, LICENSE, NAudio-LICENSE.txt $package
-          Copy-Item Licenses $package -Recurse
+          New-Item -ItemType Directory -Force "$package/licenses" | Out-Null
+          Copy-Item Licenses/* "$package/licenses" -Recurse -Force
           $hash = (Get-FileHash dist/package/SesKayit.exe -Algorithm SHA256).Hash.ToLowerInvariant()
           "$hash  SesKayit.exe" | Set-Content dist/package/SHA256SUMS.txt -Encoding utf8
           @"
