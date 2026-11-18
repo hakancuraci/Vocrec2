@@ -9,8 +9,10 @@ Vocrec2 doğrulama
   URL doğrulama ve ayarların JSON kalıcılığı.
 - Windows x64 bağımsız paket üretildi; gerekli STT/FFmpeg dosyaları
   paket yerleşiminde kontrol edilir.
-- Bu ortamda Windows AAC/WinForms testleri çalıştırılmadı. GitHub Actions
-  bunları Windows runner üzerinde çalıştıracak şekilde yapılandırıldı.
+- GitHub Actions Windows runner üzerinde 12 Windows AAC/kayıt testi
+  geçti; 29 genel test ile birlikte toplam 41 test başarılı.
+- Paketleme için .NET SDK 8.0.4xx sürümü global.json ile sabitlendi;
+  runner üzerindeki daha yeni SDK sürümleri bu projeyi değiştirmez.
 - Manas model ağırlıkları yok; gerçek STT ve fiziksel mikrofon dinleme
   testi yapılmadı. Qwen servisi sağlanmadığından REST testleri sahtedir.
 - GitHub erişimi güncellendikten sonra kaynak kod
