@@ -40,6 +40,23 @@ internal static class Program
                 using var compact = new Bitmap(form.Width, form.Height);
                 form.DrawToBitmap(compact, new Rectangle(Point.Empty, compact.Size));
                 compact.Save(Path.Combine(Path.GetDirectoryName(path)!, "SesKayit-compact.png"), ImageFormat.Png);
+                var tabs = Descendants(form).OfType<TabControl>().Single();
+                tabs.SelectedTab = tabs.TabPages.Cast<TabPage>().Single(t => t.Text == "STT / LLM ayarları");
+                form.Size = new Size(1020, 1160);
+                form.PerformLayout(); form.Refresh();
+                Application.DoEvents();
+                var save = Descendants(form).Single(c => c is Button && c.Text == "Ayarları kaydet");
+                var mic = Descendants(form).OfType<CheckBox>().Single(c => c.Text == "Mikrofon konuşma iyileştirme");
+                if (!save.Visible || !mic.Visible || !form.ClientRectangle.Contains(form.RectangleToClient(save.RectangleToScreen(save.ClientRectangle))))
+                    throw new InvalidOperationException("The new settings must be visible in the full screenshot.");
+                Capture(form, "Vocrec2-STT-LLM-full.png", path);
+                form.Size = new Size(1020, 760);
+                form.PerformLayout(); form.Refresh(); Application.DoEvents();
+                Capture(form, "Vocrec2-STT-LLM-top.png", path);
+                var scroll = tabs.SelectedTab.Controls.OfType<Panel>().Single();
+                scroll.ScrollControlIntoView(save);
+                form.PerformLayout(); form.Refresh(); Application.DoEvents();
+                Capture(form, "Vocrec2-STT-LLM-bottom.png", path);
                 result = 0;
             }
             catch (Exception ex) { Console.Error.WriteLine(ex); }
@@ -48,6 +65,13 @@ internal static class Program
         form.Shown += (_, _) => captureTimer.Start();
         Application.Run(form);
         return result;
+    }
+
+    private static void Capture(Form form, string name, string originalPath)
+    {
+        using var bitmap = new Bitmap(form.Width, form.Height);
+        form.DrawToBitmap(bitmap, new Rectangle(Point.Empty, bitmap.Size));
+        bitmap.Save(Path.Combine(Path.GetDirectoryName(originalPath)!, name), ImageFormat.Png);
     }
 
     private static void CheckImportantControls(Form form)
