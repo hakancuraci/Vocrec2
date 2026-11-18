@@ -34,6 +34,9 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
+      - name: Build Visual Studio solution
+        run: dotnet build Vocrec.sln -c Release -warnaserror
+
       - name: Test mixer
         run: >-
           dotnet test Tests/SesKayit.Tests.csproj -c Release

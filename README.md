@@ -48,9 +48,24 @@ Değerler ondalık MB olarak hesaplanmıştır; kapsayıcı ek yükü nedeniyle 
 
 ## Kaynaktan derleme
 
+### Visual Studio ile açma
+
+Windows'ta güncel **Visual Studio 2022** (en az 17.8), **.NET masaüstü geliştirme** iş yükü ve **.NET 8 SDK** gerekir. Visual Studio Installer'dan iş yükünü ekleyebilirsiniz; depodaki `.vsconfig` dosyası da gereken iş yükünü belirtir.
+
+1. GitHub'dan indirdiğiniz ZIP'i bir klasöre çıkartın; ZIP'in içinden doğrudan açmayın.
+2. Ana klasördeki **`Vocrec.sln`** dosyasını açın.
+3. NuGet paketlerinin geri yüklenmesini bekleyin. Gerekirse çözüme sağ tıklayıp **NuGet Paketlerini Geri Yükle / Restore NuGet Packages** seçin; ilk geri yükleme internet bağlantısı gerektirir.
+4. Çözüm Gezgini'nde **`SesKayit`** projesine sağ tıklayıp **Başlangıç Projesi Olarak Ayarla / Set as Startup Project** seçin. Bu proje `App/SesKayit.csproj` dosyasıdır; test veya ekran görüntüsü projesini başlangıç projesi yapmayın.
+5. **F5** ile hata ayıklayarak, **Ctrl+F5** ile normal çalıştırın.
+
+Çözüm uygulamayı, ortak ses motorunu, iki test projesini ve ekran görüntüsü aracını birlikte içerir. Çözüm yapılandırmaları `Debug | Any CPU` ve `Release | Any CPU` olarak tanımlıdır; indirilebilir EXE ayrıca Windows x64 için yayınlanır.
+
+### Komut satırı ile derleme
+
 .NET 8 SDK gerekir. PowerShell'de proje klasöründen:
 
 ```powershell
+dotnet build Vocrec.sln -c Release
 dotnet test Tests/SesKayit.Tests.csproj -c Release
 dotnet publish App/SesKayit.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=None -p:DebugSymbols=false -o dist/win-x64
 ```

@@ -3,3 +3,5 @@
 dist/
 TestResults/
 *.user
+.vs/
+*.suo
