@@ -40,24 +40,16 @@ internal static class Program
                 using var compact = new Bitmap(form.Width, form.Height);
                 form.DrawToBitmap(compact, new Rectangle(Point.Empty, compact.Size));
                 compact.Save(Path.Combine(Path.GetDirectoryName(path)!, "SesKayit-compact.png"), ImageFormat.Png);
-                var tabs = Descendants(form).OfType<TabControl>().Single();
-                tabs.SelectedTab = tabs.TabPages.Cast<TabPage>().Single(t => t.Text == "STT / LLM ayarları");
-                form.MaximumSize = new Size(1600, 1600);
-                form.Size = new Size(1020, 1160);
-                form.PerformLayout(); form.Refresh();
-                Application.DoEvents();
-                var save = Descendants(form).Single(c => c is Button && c.Text == "Ayarları kaydet");
-                var mic = Descendants(form).OfType<CheckBox>().Single(c => c.Text == "Mikrofon konuşma iyileştirme");
-                Console.WriteLine($"Settings window: {form.Size}; save visible: {save.Visible}; mic visible: {mic.Visible}; save bounds: {form.RectangleToClient(save.RectangleToScreen(save.ClientRectangle))}");
-                Capture(form, "Vocrec2-STT-LLM-full.png", path);
                 form.Size = new Size(1020, 760);
+                var processingTab = Descendants(form).OfType<Button>().Single(c => c.Name == "ProcessingTab");
+                processingTab.PerformClick();
                 form.PerformLayout(); form.Refresh(); Application.DoEvents();
-                Capture(form, "Vocrec2-STT-LLM-top.png", path);
-                var scroll = tabs.SelectedTab.Controls.OfType<Panel>().Single();
-                scroll.ScrollControlIntoView(save);
+                CheckProcessingControls(form);
+                Capture(form, "Vocrec2-STT-LLM.png", path);
+                form.Size = form.MinimumSize;
                 form.PerformLayout(); form.Refresh(); Application.DoEvents();
-                Capture(form, "Vocrec2-STT-LLM-bottom.png", path);
-                if (!save.Visible || !mic.Visible) throw new InvalidOperationException("The settings controls must be visible.");
+                CheckProcessingControls(form);
+                Capture(form, "Vocrec2-STT-LLM-compact.png", path);
                 result = 0;
             }
             catch (Exception ex) { Console.Error.WriteLine(ex); }
@@ -73,6 +65,23 @@ internal static class Program
         using var bitmap = new Bitmap(form.Width, form.Height);
         form.DrawToBitmap(bitmap, new Rectangle(Point.Empty, bitmap.Size));
         bitmap.Save(Path.Combine(Path.GetDirectoryName(originalPath)!, name), ImageFormat.Png);
+    }
+
+    private static void CheckProcessingControls(Form form)
+    {
+        var controls = Descendants(form).ToArray();
+        if (controls.OfType<TabControl>().Any()) throw new InvalidOperationException("Native white tabs must not return.");
+        foreach (string name in new[] { "STT metin çıktı klasörü", "LLM özet çıktı klasörü", "Servis URL", "Model", "Bearer token · isteğe bağlı", "Özet prompt", "Mikrofon konuşma iyileştirme" })
+        {
+            var control = controls.Single(c => c.AccessibleName == name);
+            var bounds = form.RectangleToClient(control.RectangleToScreen(control.ClientRectangle));
+            if (!control.Visible || !form.ClientRectangle.Contains(bounds) || control.Width < 40 || control.Height < 16)
+                throw new InvalidOperationException($"Setting must be visible without scrolling: {name}; bounds: {bounds}; form: {form.ClientRectangle}");
+        }
+        var save = controls.Single(c => c is Button && c.Text == "Ayarları kaydet");
+        if (!save.Visible || !form.ClientRectangle.Contains(form.RectangleToClient(save.RectangleToScreen(save.ClientRectangle))))
+            throw new InvalidOperationException("Save action must remain visible without scrolling.");
+        Console.WriteLine($"Modern settings layout verified at {form.Size}.");
     }
 
     private static void CheckImportantControls(Form form)

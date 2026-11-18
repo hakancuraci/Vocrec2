@@ -53,6 +53,7 @@ internal sealed class StudioButton : Button
 {
     public bool Primary { get; set; }
     public bool Accent { get; set; }
+    public bool Selected { get; set; }
     private bool hovered;
     public StudioButton()
     {
@@ -67,11 +68,11 @@ internal sealed class StudioButton : Button
     {
         var g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias;
         g.Clear(StudioTheme.Surface(Parent));
-        Color fill = Primary ? StudioTheme.Mint : (hovered && Enabled ? Color.FromArgb(42, 48, 66) : StudioTheme.Field);
+        Color fill = Selected ? Color.FromArgb(47, 40, 72) : Primary ? StudioTheme.Mint : (hovered && Enabled ? Color.FromArgb(42, 48, 66) : StudioTheme.Field);
         if (!Enabled) fill = Color.FromArgb(27, 32, 43);
-        Color ink = !Enabled ? Color.FromArgb(108, 120, 140) : Primary ? StudioTheme.Background : Accent ? StudioTheme.Purple : StudioTheme.Ink;
+        Color ink = !Enabled ? Color.FromArgb(108, 120, 140) : Primary ? StudioTheme.Background : (Accent || Selected) ? StudioTheme.Purple : StudioTheme.Ink;
         using var path = StudioTheme.Round(new RectangleF(.5f, .5f, Width - 1, Height - 1), 9);
-        using var brush = new SolidBrush(fill); using var pen = new Pen(Accent && Enabled ? StudioTheme.Purple : StudioTheme.Border);
+        using var brush = new SolidBrush(fill); using var pen = new Pen((Accent || Selected) && Enabled ? StudioTheme.Purple : StudioTheme.Border);
         g.FillPath(brush, path); if (!Primary) g.DrawPath(pen, path);
         TextRenderer.DrawText(g, Text, Font, ClientRectangle, ink, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
         if (Focused) { using var focusPen = new Pen(StudioTheme.Purple); g.DrawRectangle(focusPen, 4, 4, Width - 9, Height - 9); }
@@ -174,6 +175,7 @@ internal sealed class DevicePicker : ListBox
 
 internal sealed class StudioSwitch : CheckBox
 {
+    public string OffText { get; set; } = "Elle";
     public StudioSwitch()
     {
         SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
@@ -188,7 +190,7 @@ internal sealed class StudioSwitch : CheckBox
         using var fill = new SolidBrush(Checked ? StudioTheme.Purple : StudioTheme.Border);
         using var knob = new SolidBrush(StudioTheme.Ink);
         e.Graphics.FillPath(fill, path); e.Graphics.FillEllipse(knob, x + (Checked ? 25 : 4), y + 4, 16, 16);
-        TextRenderer.DrawText(e.Graphics, Checked ? "Açık" : "Elle", Font, new Rectangle(0, 0, Width - 58, Height), StudioTheme.Ink, TextFormatFlags.Right | TextFormatFlags.VerticalCenter);
+        TextRenderer.DrawText(e.Graphics, Checked ? "Açık" : OffText, Font, new Rectangle(0, 0, Width - 58, Height), StudioTheme.Ink, TextFormatFlags.Right | TextFormatFlags.VerticalCenter);
         if (Focused) ControlPaint.DrawFocusRectangle(e.Graphics, ClientRectangle, StudioTheme.Purple, BackColor);
     }
 }

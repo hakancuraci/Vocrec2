@@ -5,13 +5,27 @@ namespace SesKayit;
 public sealed partial class MainForm
 {
     private Action? updateTextLayout;
+    private readonly Panel recordingPage = new() { Dock = DockStyle.Fill, AccessibleName = "Kayıt çalışma alanı" };
+    private readonly Panel processingPage = new() { Dock = DockStyle.Fill, AccessibleName = "STT ve LLM çalışma alanı" };
+    private readonly StudioButton recordingTab = MakeButton("Kayıt");
+    private readonly StudioButton processingTab = MakeButton("STT / LLM ayarları");
+
+    private void SelectWorkspace(bool processing)
+    {
+        recordingPage.Visible = !processing; processingPage.Visible = processing;
+        (processing ? processingPage : recordingPage).BringToFront();
+        recordingTab.Selected = !processing; processingTab.Selected = processing;
+        recordingTab.AccessibleDescription = processing ? "Kayıt sekmesini aç" : "Seçili sekme";
+        processingTab.AccessibleDescription = processing ? "Seçili sekme" : "STT ve LLM ayarlarını aç";
+        recordingTab.Invalidate(); processingTab.Invalidate();
+    }
 
     private void BuildLayout()
     {
         SuspendLayout();
         var root = Grid(1, 4); root.Padding = new Padding(22, 4, 22, 18);
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 72));
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 94));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 56));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 108));
         Controls.Add(root);
@@ -34,7 +48,8 @@ public sealed partial class MainForm
         automationGrid.Controls.Add(LabelText("Tüm ses çıkışları ve mikrofonlar seçili gelir. Tek tıkla kayıt.", 9), 0, 1);
         automationGrid.Controls.Add(LabelText("Teams’te sessize almak yerel mikrofon kaydını durdurmaz.", 8), 0, 2);
         automationGrid.Controls.Add(automatic, 1, 0); automationGrid.SetRowSpan(automatic, 3);
-        automationCard.Controls.Add(automationGrid); root.Controls.Add(automationCard, 0, 1);
+        automationCard.Controls.Add(automationGrid);
+        automationCard.Margin = new Padding(0, 0, 0, 10);
 
         var body = Grid(2, 1);
         body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 57)); body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 43));
@@ -44,15 +59,39 @@ public sealed partial class MainForm
         channels.Controls.Add(ChannelCard("Mikrofonlar", "GİRİŞ", "Tüm mikrofonlar hazır; elle seçim için otomatik modu kapatın.", microphones, micApps, micGain, micMeter), 0, 1);
         body.Controls.Add(channels, 0, 0);
 
-        var settings = Grid(1, 2);
-        settings.RowStyles.Add(new RowStyle(SizeType.Percent, 55)); settings.RowStyles.Add(new RowStyle(SizeType.Percent, 45));
-        settings.Controls.Add(DestinationCard(), 0, 0); settings.Controls.Add(QualityCard(), 0, 1);
-        var tabs = new TabControl { Dock = DockStyle.Fill };
-        var recordingTab = new TabPage("Kayıt") { BackColor = Bg };
-        recordingTab.Controls.Add(settings); tabs.TabPages.Add(recordingTab);
-        var processingTab = new TabPage("STT / LLM ayarları") { BackColor = Bg };
-        processingTab.Controls.Add(ProcessingCard()); tabs.TabPages.Add(processingTab);
-        body.Controls.Add(tabs, 1, 0); root.Controls.Add(body, 0, 2);
+        var recordingSettings = Grid(1, 2);
+        recordingSettings.RowStyles.Add(new RowStyle(SizeType.Percent, 57)); recordingSettings.RowStyles.Add(new RowStyle(SizeType.Percent, 43));
+        recordingSettings.Controls.Add(DestinationCard(), 0, 0); recordingSettings.Controls.Add(QualityCard(), 0, 1);
+        body.Controls.Add(recordingSettings, 1, 0);
+        var recordingStack = Grid(1, 2);
+        recordingStack.RowStyles.Add(new RowStyle(SizeType.Absolute, 86));
+        recordingStack.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        recordingStack.Controls.Add(automationCard, 0, 0); recordingStack.Controls.Add(body, 0, 1);
+        recordingPage.Controls.Add(recordingStack);
+        processingPage.Controls.Add(ProcessingCard());
+        var workspace = new Panel { Dock = DockStyle.Fill, Margin = Padding.Empty };
+        workspace.Controls.Add(recordingPage); workspace.Controls.Add(processingPage);
+        root.Controls.Add(workspace, 0, 2);
+
+        var navigation = Grid(2, 1);
+        navigation.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 360));
+        navigation.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        var segments = new StudioCard { Dock = DockStyle.Fill, Padding = new Padding(4), Margin = new Padding(0, 0, 0, 10) };
+        var segmentGrid = Grid(2, 1);
+        segmentGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 38)); segmentGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 62));
+        recordingTab.Name = "RecordingTab"; processingTab.Name = "ProcessingTab";
+        recordingTab.AccessibleRole = processingTab.AccessibleRole = AccessibleRole.PageTab;
+        recordingTab.AccessibleName = "Kayıt sekmesi"; processingTab.AccessibleName = "STT ve LLM ayarları sekmesi";
+        recordingTab.Margin = new Padding(0, 0, 4, 0); processingTab.Margin = Padding.Empty;
+        segmentGrid.Controls.Add(recordingTab, 0, 0); segmentGrid.Controls.Add(processingTab, 1, 0); segments.Controls.Add(segmentGrid);
+        recordingTab.Click += (_, _) => SelectWorkspace(false); processingTab.Click += (_, _) => SelectWorkspace(true);
+        recordingTab.KeyDown += (_, e) => { if (e.KeyCode == Keys.Right) { processingTab.Focus(); SelectWorkspace(true); e.Handled = true; } };
+        processingTab.KeyDown += (_, e) => { if (e.KeyCode == Keys.Left) { recordingTab.Focus(); SelectWorkspace(false); e.Handled = true; } };
+        navigation.Controls.Add(segments, 0, 0);
+        var flowHint = LabelText("Kayıt  →  Metin  →  Özet", 9); flowHint.TextAlign = ContentAlignment.MiddleRight;
+        flowHint.Margin = new Padding(10, 0, 0, 10); navigation.Controls.Add(flowHint, 1, 0);
+        root.Controls.Add(navigation, 0, 1);
+        SelectWorkspace(false);
 
         var recording = new StudioCard { Dock = DockStyle.Fill, Margin = new Padding(0, 8, 0, 0), Padding = new Padding(16, 10, 16, 8) };
         var recordingGrid = Grid(1, 2);
@@ -187,7 +226,7 @@ public sealed partial class MainForm
     private void AddWindowChrome()
     {
         var chrome = new Panel { Dock = DockStyle.Top, Height = 32, Padding = new Padding(22, 0, 8, 0), BackColor = Bg };
-        var caption = LabelText("vocrec  /  Ses kayıt stüdyosu", 8); caption.ForeColor = StudioTheme.Muted;
+        var caption = LabelText("Vocrec2  /  Ses kayıt stüdyosu", 8); caption.ForeColor = StudioTheme.Muted;
         var buttons = new FlowLayoutPanel { Dock = DockStyle.Right, Width = 114, FlowDirection = FlowDirection.LeftToRight, WrapContents = false };
         foreach (var text in new[] { "−", "□", "×" })
         {

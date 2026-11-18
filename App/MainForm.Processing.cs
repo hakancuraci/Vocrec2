@@ -6,7 +6,8 @@ namespace SesKayit;
 public sealed partial class MainForm
 {
     private readonly TextBox transcriptFolder = new(), summaryFolder = new(), llmUrl = new(), llmModel = new(), llmPrompt = new(), llmBearerToken = new() { UseSystemPasswordChar = true };
-    private readonly CheckBox enhanceMic = new() { Text = "Mikrofon konuşma iyileştirme", AutoSize = true };
+    private readonly StudioSwitch enhanceMic = new() { Text = "Mikrofon konuşma iyileştirme", AccessibleName = "Mikrofon konuşma iyileştirme", OffText = "Kapalı" };
+    private readonly Label processingSaveState = LabelText("URL boşsa yalnızca metin oluşturulur.", 8);
     private readonly StudioButton saveProcessing = MakeButton("Ayarları kaydet");
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte> queued = new();
     private string PendingDirectory => Path.Combine(Path.GetDirectoryName(settingsPath)!, "pending");
@@ -15,55 +16,102 @@ public sealed partial class MainForm
 
     private Control ProcessingCard()
     {
-        var scroll = new Panel { Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(12) };
-        var grid = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 1 };
-        grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        void Row(Control control, int height)
-        {
-            int row = grid.RowCount++;
-            grid.RowStyles.Add(new RowStyle(SizeType.Absolute, height));
-            control.Dock = DockStyle.Fill; control.Margin = new Padding(0, 2, 0, 4); grid.Controls.Add(control, 0, row);
-        }
-        void Field(string label, TextBox input, int height = 32)
-        {
-            Row(LabelText(label, 9), 25);
-            input.BackColor = StudioTheme.Field; input.ForeColor = StudioTheme.Ink;
-            input.AccessibleName = label; Row(input, height);
-            configuration.Add(input);
-        }
-        void Folder(string label, TextBox input)
-        {
-            Field(label, input);
-            var button = MakeButton("Klasör seç");
-            button.Click += (_, _) =>
-            {
-                using var dialog = new FolderBrowserDialog { InitialDirectory = input.Text };
-                if (dialog.ShowDialog(this) == DialogResult.OK) input.Text = dialog.SelectedPath;
-            };
-            Row(button, 32); configuration.Add(button);
-        }
-        Row(Heading("Otomatik metin ve özet", 11), 32);
-        Row(LabelText("Kayıt bitince STT çalışır. Boş LLM URL: yalnız metin.", 8), 36);
-        Folder("STT metin çıktı klasörü", transcriptFolder);
-        Field("Qwen / OpenAI uyumlu servis URL", llmUrl);
-        Field("Bearer token (isteğe bağlı)", llmBearerToken);
-        hints.SetToolTip(llmBearerToken, "Token değerini girin. Windows hesabınıza bağlı şifreli kaydedilir. Boş bırakıp kaydetmek tokenı kaldırır.");
-        Field("Model adı", llmModel);
+        var columns = Grid(2, 1);
+        columns.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 36)); columns.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 64));
+        var left = Grid(1, 2);
+        left.RowStyles.Add(new RowStyle(SizeType.Percent, 66)); left.RowStyles.Add(new RowStyle(SizeType.Percent, 34));
+
+        var outputCard = new StudioCard { Dock = DockStyle.Fill, Padding = new Padding(18), Margin = new Padding(0, 0, 14, 12) };
+        var outputGrid = Grid(1, 7);
+        foreach (int height in new[] { 26, 30, 22, 42, 12, 22 }) outputGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, height));
+        outputGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        outputGrid.Controls.Add(Heading("Çıktı klasörleri", 12), 0, 0);
+        outputGrid.Controls.Add(LabelText("Her kayıt için ayrı metin ve özet.", 9), 0, 1);
+        outputGrid.Controls.Add(LabelText("STT metin dosyası", 9), 0, 2);
+        outputGrid.Controls.Add(FolderField(transcriptFolder, "STT metin çıktı klasörü"), 0, 3);
+        outputGrid.Controls.Add(LabelText("LLM özet dosyası", 9), 0, 5);
+        var summaryHost = Grid(1, 2);
+        summaryHost.RowStyles.Add(new RowStyle(SizeType.Absolute, 42)); summaryHost.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        summaryHost.Controls.Add(FolderField(summaryFolder, "LLM özet çıktı klasörü"), 0, 0);
+        outputGrid.Controls.Add(summaryHost, 0, 6);
+        outputCard.Controls.Add(outputGrid); left.Controls.Add(outputCard, 0, 0);
+
+        var micCard = new StudioCard { Dock = DockStyle.Fill, Padding = new Padding(18, 12, 18, 12), Margin = new Padding(0, 0, 14, 0) };
+        var micGrid = Grid(1, 3);
+        micGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, 26)); micGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); micGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, 32));
+        micGrid.Controls.Add(Heading("Mikrofon iyileştirme", 11), 0, 0);
+        micGrid.Controls.Add(LabelText("Gürültüyü azaltır, konuşma\nseviyesini dengeler.", 9), 0, 1);
+        enhanceMic.BackColor = StudioTheme.Card; micGrid.Controls.Add(enhanceMic, 0, 2);
+        micCard.Controls.Add(micGrid); left.Controls.Add(micCard, 0, 1);
+        configuration.Add(enhanceMic); columns.Controls.Add(left, 0, 0);
+
+        var llmCard = new StudioCard { Dock = DockStyle.Fill, Padding = new Padding(18, 14, 18, 14), Margin = Padding.Empty };
+        var llmGrid = Grid(1, 7);
+        foreach (int height in new[] { 26, 24, 64, 64 }) llmGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, height));
+        llmGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        llmGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, 24)); llmGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
+        var title = Grid(2, 1); title.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); title.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 112));
+        title.Controls.Add(Heading("LLM ile özet", 12), 0, 0);
+        var badge = LabelText("İSTEĞE BAĞLI", 8); badge.ForeColor = StudioTheme.Purple; badge.TextAlign = ContentAlignment.MiddleRight; title.Controls.Add(badge, 1, 0);
+        llmGrid.Controls.Add(title, 0, 0);
+        llmGrid.Controls.Add(LabelText("Bağlantınızı kurun, özetin içeriğini prompt ile belirleyin.", 9), 0, 1);
+        var connection = Grid(2, 1); connection.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 62)); connection.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 38));
+        var urlField = InputField("Servis URL", llmUrl, "http://localhost:8000/v1"); urlField.Margin = new Padding(0, 0, 12, 6);
+        connection.Controls.Add(urlField, 0, 0); connection.Controls.Add(InputField("Model", llmModel, "Örn. Qwen3-8B"), 1, 0);
+        llmGrid.Controls.Add(connection, 0, 2);
+        var tokenGrid = InputField("Bearer token · isteğe bağlı", llmBearerToken, "Tokenınızı girin", secret: true);
+        llmGrid.Controls.Add(tokenGrid, 0, 3);
+        hints.SetToolTip(llmBearerToken, "Windows hesabınıza bağlı şifreli kaydedilir. Boş bırakıp kaydetmek tokenı kaldırır.");
         llmPrompt.Multiline = true; llmPrompt.ScrollBars = ScrollBars.Vertical;
-        Field("LLM özet prompt", llmPrompt, 100);
-        Folder("LLM özet çıktı klasörü", summaryFolder);
-        Row(enhanceMic, 38); Row(saveProcessing, 38);
-        var retry = MakeButton("Bekleyen işlemleri yeniden dene");
+        llmGrid.Controls.Add(InputField("Özet prompt", llmPrompt, "Özetin dili, ayrıntı seviyesi ve içeriği…"), 0, 4);
+        llmGrid.Controls.Add(processingSaveState, 0, 5);
+        var actions = Grid(2, 1); actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 48)); actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 52));
+        var retry = MakeButton("Bekleyenleri yeniden dene"); retry.Font = new Font("Segoe UI", 9); retry.Margin = new Padding(0, 0, 10, 0);
         retry.Click += (_, _) => ResumePending(useCurrentSettings: true);
-        Row(retry, 38);
-        configuration.Add(retry);
-        configuration.Add(enhanceMic); configuration.Add(saveProcessing);
-        scroll.Controls.Add(grid); return scroll;
+        saveProcessing.Primary = true; saveProcessing.Margin = Padding.Empty;
+        actions.Controls.Add(retry, 0, 0); actions.Controls.Add(saveProcessing, 1, 0); llmGrid.Controls.Add(actions, 0, 6);
+        configuration.Add(retry); configuration.Add(saveProcessing);
+        llmCard.Controls.Add(llmGrid); columns.Controls.Add(llmCard, 1, 0);
+        return columns;
+    }
+
+    private Control FolderField(TextBox input, string name)
+    {
+        var row = Grid(2, 1); row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 66));
+        input.AccessibleName = name;
+        var field = new StudioTextField(input) { Dock = DockStyle.Fill, Margin = new Padding(0, 0, 8, 0) };
+        var pick = MakeButton("Seç"); pick.Accent = true; pick.Margin = Padding.Empty; pick.AccessibleName = name + " seç";
+        pick.Click += (_, _) =>
+        {
+            using var dialog = new FolderBrowserDialog { InitialDirectory = input.Text };
+            if (dialog.ShowDialog(this) == DialogResult.OK) input.Text = dialog.SelectedPath;
+        };
+        hints.SetToolTip(input, name); row.Controls.Add(field, 0, 0); row.Controls.Add(pick, 1, 0);
+        configuration.Add(input); configuration.Add(pick); return row;
+    }
+
+    private Control InputField(string label, TextBox input, string placeholder, bool secret = false)
+    {
+        var grid = Grid(1, 2); grid.Margin = new Padding(0, 0, 0, 6);
+        grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 22)); grid.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        grid.Controls.Add(LabelText(label, 9), 0, 0);
+        input.AccessibleName = label; input.PlaceholderText = placeholder;
+        var field = new StudioTextField(input) { Dock = DockStyle.Fill, Margin = Padding.Empty };
+        if (secret)
+        {
+            var reveal = MakeButton("Göster"); reveal.Dock = DockStyle.Right; reveal.Width = 68; reveal.Margin = Padding.Empty; reveal.Font = new Font("Segoe UI", 8); reveal.AccessibleName = "Bearer tokenı göster veya gizle";
+            reveal.Click += (_, _) => { llmBearerToken.UseSystemPasswordChar = !llmBearerToken.UseSystemPasswordChar; reveal.Text = llmBearerToken.UseSystemPasswordChar ? "Göster" : "Gizle"; };
+            field.Controls.Add(reveal); configuration.Add(reveal);
+        }
+        grid.Controls.Add(field, 0, 1); configuration.Add(input); return grid;
     }
 
     private void InitializeProcessingControls()
     {
         Shown += (_, _) => ResumePending(useCurrentSettings: false);
+        foreach (var field in new[] { transcriptFolder, summaryFolder, llmUrl, llmModel, llmPrompt, llmBearerToken })
+            field.TextChanged += (_, _) => { processingSaveState.Text = "Değişiklikleri uygulamak için kaydedin."; processingSaveState.ForeColor = StudioTheme.Muted; };
+        enhanceMic.CheckedChanged += (_, _) => processingSaveState.Text = "Değişiklikleri uygulamak için kaydedin.";
         saveProcessing.Click += (_, _) =>
         {
             try
@@ -82,6 +130,7 @@ public sealed partial class MainForm
                 try { PersistSettings(); }
                 catch { settings.Processing = previous; throw; }
                 status.Text = "STT / LLM ayarları kaydedildi.";
+                processingSaveState.Text = "✓ Ayarlar kaydedildi"; processingSaveState.ForeColor = StudioTheme.Mint;
             }
             catch (Exception ex) { ShowError(ex); }
         };
@@ -94,6 +143,7 @@ public sealed partial class MainForm
         enhanceMic.Checked = value.EnhanceMicrophone;
         try { llmBearerToken.Text = LlmTokenProtection.Unprotect(value.ProtectedLlmBearerToken); }
         catch (InvalidOperationException ex) { llmBearerToken.Clear(); status.Text = ex.Message; hints.SetToolTip(llmBearerToken, ex.Message); }
+        processingSaveState.Text = "URL boşsa yalnızca metin oluşturulur.";
     }
 
     private void PersistSettings()
