@@ -1,0 +1,8 @@
+<Project>
+ <ItemGroup Condition="'$(MSBuildProjectName)' == 'SesKayit'">
+  <Content Include="$(MSBuildThisFileDirectory)vendor/trslocalwin/runtimes/win-x64/native/balbal_native.dll" Link="balbal_native.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+  <Content Include="$(MSBuildThisFileDirectory)vendor/trslocalwin/portable-assets/**/*" Link="%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+  <Content Include="$(MSBuildThisFileDirectory)vendor/trslocalwin/native/licenses/**/*" Link="licenses/native/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+  <Content Include="$(MSBuildThisFileDirectory)vendor/trslocalwin/LICENSE;$(MSBuildThisFileDirectory)vendor/trslocalwin/NOTICE" Link="licenses/trslocalwin/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+ </ItemGroup>
+</Project>

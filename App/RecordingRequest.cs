@@ -2,7 +2,7 @@ using SesKayit.Core;
 
 namespace SesKayit;
 
-internal sealed record RecordingRequest(DeviceChoice[] Sources, string Folder, int Bitrate, float SystemGain, float MicGain, bool Automatic);
+internal sealed record RecordingRequest(DeviceChoice[] Sources, string Folder, int Bitrate, float SystemGain, float MicGain, bool Automatic, bool EnhanceMicrophone = true);
 
 public interface IRecordingSession : IDisposable
 {

@@ -15,6 +15,7 @@ public sealed class RecordingSession : IRecordingSession
     private readonly Dictionary<string, SourceCapture> sources = [];
     private readonly MMDeviceEnumerator enumerator = new();
     private bool stopping;
+    private readonly bool enhanceMicrophone;
     public bool Automatic { get; }
     public AudioMixer Mixer { get; private set; } = null!;
     public MixerInput[] Inputs => Mixer.CurrentInputs;
@@ -24,9 +25,10 @@ public sealed class RecordingSession : IRecordingSession
     public Exception? CaptureError => sources.Values.Select(s => s.Error).FirstOrDefault(e => e != null);
     public string? Warning { get; private set; }
 
-    public RecordingSession(IEnumerable<DeviceChoice> choices, string folder, int bitrate, float systemGain, float micGain, bool automatic = false)
+    public RecordingSession(IEnumerable<DeviceChoice> choices, string folder, int bitrate, float systemGain, float micGain, bool automatic = false, bool enhanceMicrophone = true)
     {
         Automatic = automatic;
+        this.enhanceMicrophone = enhanceMicrophone;
         Directory.CreateDirectory(folder);
         string name = $"Kayit_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}_{Guid.NewGuid().ToString("N")[..6]}";
         OutputPath = Path.Combine(folder, name + ".m4a");
@@ -49,7 +51,7 @@ public sealed class RecordingSession : IRecordingSession
         foreach (var choice in choices.DistinctBy(c => c.Id))
         {
             if (sources.ContainsKey(choice.Id)) continue;
-            try { sources.Add(choice.Id, new SourceCapture(enumerator.GetDevice(choice.Id), choice)); }
+            try { sources.Add(choice.Id, new SourceCapture(enumerator.GetDevice(choice.Id), choice, enhanceMicrophone)); }
             catch (Exception ex)
             {
                 if (!Automatic) throw;
@@ -108,7 +110,7 @@ public sealed class RecordingSession : IRecordingSession
         public BufferedWaveProvider Buffer { get; } = null!;
         public MixerInput Input { get; } = null!;
 
-        public SourceCapture(MMDevice device, DeviceChoice choice)
+        public SourceCapture(MMDevice device, DeviceChoice choice, bool enhanceMicrophone)
         {
             this.device = device;
             try
@@ -132,6 +134,7 @@ public sealed class RecordingSession : IRecordingSession
                 ISampleProvider samples = new StereoSource(Buffer.ToSampleProvider());
                 if (samples.WaveFormat.SampleRate != AudioMixer.Rate)
                     samples = new WdlResamplingSampleProvider(samples, AudioMixer.Rate);
+                if (choice.Microphone && enhanceMicrophone) samples = new MicrophoneEnhancer(samples);
                 Input = new MixerInput(samples, choice.Microphone);
                 capture.StartRecording();
             }

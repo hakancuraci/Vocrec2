@@ -19,7 +19,7 @@ public sealed partial class MainForm
 
         var header = new Panel { Dock = DockStyle.Fill, BackColor = Bg };
         var mark = new BrandMark { Location = new Point(0, 13) }; header.Controls.Add(mark);
-        var name = Heading("vocrec", 25); name.Dock = DockStyle.None; name.AutoSize = true; name.AutoEllipsis = false;
+        var name = Heading("Vocrec2", 25); name.Dock = DockStyle.None; name.AutoSize = true; name.AutoEllipsis = false;
         name.AccessibleName = "Uygulama başlığı"; name.Padding = new Padding(0, 3, 0, 3); header.Controls.Add(name);
         var tagline = LabelText("Sistem sesi ve mikrofon. Tek bir kayıtta.", 9); tagline.Dock = DockStyle.None; tagline.AutoSize = true; tagline.AutoEllipsis = false;
         tagline.AccessibleName = "Uygulama açıklaması"; header.Controls.Add(tagline);
@@ -47,7 +47,12 @@ public sealed partial class MainForm
         var settings = Grid(1, 2);
         settings.RowStyles.Add(new RowStyle(SizeType.Percent, 55)); settings.RowStyles.Add(new RowStyle(SizeType.Percent, 45));
         settings.Controls.Add(DestinationCard(), 0, 0); settings.Controls.Add(QualityCard(), 0, 1);
-        body.Controls.Add(settings, 1, 0); root.Controls.Add(body, 0, 2);
+        var tabs = new TabControl { Dock = DockStyle.Fill };
+        var recordingTab = new TabPage("Kayıt") { BackColor = Bg };
+        recordingTab.Controls.Add(settings); tabs.TabPages.Add(recordingTab);
+        var processingTab = new TabPage("STT / LLM ayarları") { BackColor = Bg };
+        processingTab.Controls.Add(ProcessingCard()); tabs.TabPages.Add(processingTab);
+        body.Controls.Add(tabs, 1, 0); root.Controls.Add(body, 0, 2);
 
         var recording = new StudioCard { Dock = DockStyle.Fill, Margin = new Padding(0, 8, 0, 0), Padding = new Padding(16, 10, 16, 8) };
         var recordingGrid = Grid(1, 2);

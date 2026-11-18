@@ -1,107 +1,53 @@
-# Ses Kayıt
+# Vocrec2
 
-Windows 10/11 x64 için, bilgisayar çıkışlarını ve mikrofonları aynı anda tek bir stereo M4A dosyasına kaydeden masaüstü uygulaması. Ses cihazlarından WASAPI ile alınır; sanal ses kablosu ve Stereo Mix gerektirmez. Kayıtlar bilgisayarınızda kalır; uygulamada sunucuya yükleme veya telemetri yoktur.
+Vocrec'in Windows ses kaydına, **trslocalwin ile aynı yerel Balbal/Manas STT motoru** ve isteğe bağlı **Qwen REST özeti** eklenmiştir. Kayıt arayüzü korunur; sağdaki **STT / LLM ayarları** sekmesi yapılandırma içindir.
 
-## Çalıştırma
+## Kullanım
 
-1. `SesKayit-Windows-x64.zip` arşivini bir klasöre çıkartın.
-2. `SesKayit.exe` dosyasını açın. .NET kurulumu veya yönetici yetkisi gerekmez.
-3. Varsayılan **Otomatik kaynak seçimi** açıkken tüm bağlı ses çıkışları ve mikrofonlar seçili gelir. Uygulama/oturum analizi kayıt başlatmanın ön şartı değildir; **Kaydı başlat** düğmesine bir kez basmanız yeterlidir. Elle seçim yapmak için otomatik modu kapatın. **Bilgisayar sesi** bölümünde YouTube, Teams vb. uygulamaların ses verdiği çıkışları işaretleyin. Teams kulaklığa, YouTube hoparlöre ses veriyorsa ikisini de seçin.
-4. **Mikrofonlar** bölümünde kaydedilecek mikrofonları seçin. Birden fazla çıkış ve mikrofon aynı anda seçilebilir.
-5. Sağdaki **Kayıt konumu** kartında mevcut adresi görebilirsiniz. **Kayıt klasörünü değiştir** düğmesi yeni kayıtların kaydedileceği klasörü seçer. **Klasörü görüntüle** yalnızca bu adresi Dosya Gezgini'nde açar; kayıt yerini değiştirmez. Klasör seçimi hemen saklanır.
-6. Kaliteyi seçip **Kaydı başlat** düğmesine basın. **Kaydı bitir** düğmesine bastığınızda son ses tamponları işlenir ve dosya tamamlanır. Pencereyi kapatmak da sürmekte olan kaydı tamamlar.
+1. Windows x64 paketini yazılabilir bir klasöre açın. `SesKayit.exe`, DLL, `tools`, `_internal`, `configs` ve `licenses` dosyalarını birlikte tutun.
+2. trslocalwin'de kullandığınız model klasörünü EXE yanına `models/balbal-v2-manas/` olarak kopyalayın. Model indirilmez. Gerekli dosyalar: `model.json`, `onnx/model.onnx`, `onnx/model.onnx.data`, `lm/model.binary`, `lm/tokenizer.model`. Modelin diğer dosyalarını da koruyun.
+3. **STT / LLM ayarları** bölümünde metin ve özet çıktı klasörlerini seçin, **Ayarları kaydet** düğmesine basın.
+4. Kaydı başlatın ve bitirin. `.m4a` tamamlandıktan sonra arka planda STT çalışır; `<kayıt-adı>.txt` seçtiğiniz klasöre yazılır. İşlem sürerken yeni kayıt başlatabilirsiniz. Sıradaki kayıtlar sırayla işlenir.
+5. LLM servisi hazır olduğunda URL, model ve prompt girip kaydedin. LLM için **OpenAI uyumlu `POST /v1/chat/completions`** beklenir. Örneğin `http://localhost:8000`, `http://localhost:8000/v1` veya tam `http://localhost:8000/v1/chat/completions` kullanılabilir. Model adı servisteki adla aynı olmalıdır.
+6. LLM yanıtı aynı kayıt adıyla `<kayıt-adı>.ozet.txt` olarak özet klasörüne kaydedilir. URL boşsa ağ isteği yapılmaz; yalnız STT çalışır.
 
-Ses seviyeleri kayıt sırasında değiştirilebilir. Varsayılan %70 değerleri karışımda taşmayı azaltır. Tepe sınırı uyarısı çıkarsa seviyeleri düşürün. Göstergeler yalnızca kayıt sırasında çalışır. Klasör, kalite, cihaz seçimi ve seviyeler sonraki açılış için saklanır.
+LLM prompt sistem mesajı, metin dosyası kullanıcı mesajı olarak gönderilir. Akış kapalıdır; 15 dakika zaman aşımı vardır. Bu sürüm kimlik doğrulaması gerektirmeyen OpenAI uyumlu servislere yöneliktir; Ollama'nın yerel `/api/generate` uç noktası yerine OpenAI uyumlu uç noktasını kullanın. Uzun metinlerin servis bağlam sınırına sığması gerekir. LLM cevabı alınmadan metin diske kaydedilir.
 
-Süre göstergesi kayda işlenen ses karelerinden hesaplanır ve `saat:dakika:saniye` biçiminde tam gösterilir; metin `…` ile kısaltılmaz. Durdurulduğunda son kayıt süresi kalır; yeni kayıtta sıfırlanır. Süre ve uygulama başlığı alanları yazı ölçüsüne göre boyutlanır.
+## Kalıcı ayarlar ve hata sonrası devam
 
-## Canlı kanallar ve otomatik algılama
+Ayarlar `%LOCALAPPDATA%/Vocrec2/settings.json` içinde atomik olarak saklanır. Vocrec'in mevcut ayarlarından ayrı tutulur. Ayar sekmesindeki değişiklikler **Ayarları kaydet** ile uygulanır; sıraya alınmış işler o andaki kaydedilmiş ayarları kullanır.
 
-- Kanal listelerinin altında Windows ses oturumlarının uygulama adları görünür. Örneğin Teams `ms-teams`, YouTube ise `chrome`, `msedge` veya kullandığınız tarayıcının adıyla görünebilir; sekme/site adı her zaman belirlenemez.
-- `ses var` o anda ölçülen ses seviyesini; `oturum açık · ses yok` uygulamanın açık ses oturumunu; `mikrofonu kullanıyor · ses yok` başka uygulamanın sessiz mikrofon oturumunu belirtir. Bu bilgiler yaklaşık her saniye yenilenir; çok kısa sesler göstergede kaçabilir fakat seçili kaynakta kayıt devam eder.
-- Uygulama kendi kayıt oturumunu başka uygulamanın mikrofon kullanımı olarak saymaz. Kayıt başlamadan yapılan oturum taraması mikrofon sesini açıp dinlemez.
-- **Teams’in yazılımsal sessiz düğmesi evrensel Windows API’leriyle güvenilir biçimde belirlenemez. Teams’te sessize almak bu uygulamanın mikrofon kaydını durdurmaz.** Yerel kaydı susturmak için mikrofon seviyesini %0 yapın veya kayıttan önce elle modda mikrofonu kaldırın.
-- Otomatik modda kullanılabilir tüm mikrofonlar seçilir; varsayılan olmayan veya henüz başka bir uygulamanın açmadığı mikrofonlar da dahildir. İstemediğiniz kaynakları çıkarmak için otomatik modu kapatıp elle seçim yapabilirsiniz. Uygulamaların `ses var / oturum açık` bilgisi yalnızca gösterge içindir; kaynak seçimini veya kayıt başlangıcını engellemez.
-- Kaynaklar otomatik seçilir, ancak kayıt yine **Kaydı başlat** düğmesiyle başlar. Uygulama açılışında kendi kendine kayıt başlatmaz. Uygulama listesi bilgilendirme içindir; uygulamaya özel ayrı ses yakalama yapılmaz.
-- Bazı sürücüler/korumalı oturumlar uygulama bilgisi vermeyebilir. Oturum bilgisi okunamıyorsa uyarı gösterilir; elle cihaz seçimi kullanılabilir.
+Kayıt dosyası tamamlanmadan STT başlatılmaz. İşlem kuyruğu `%LOCALAPPDATA%/Vocrec2/pending/` içinde kalıcıdır. Tamamlanamayan işler sonraki açılışta tekrar denenir. Servis adresini değiştirdikten sonra **Bekleyen işlemleri yeniden dene** düğmesi bekleyen işleri güncel kaydedilmiş ayarlarla çalıştırır. Metin zaten varsa STT tekrarlanmaz. Özet hatasında ses ve metin korunur. Hatalar aynı ayar klasöründeki `processing-errors.log` dosyasına yazılır. Uygulama normal kapanışta devam eden işleri bekler.
 
-## Kalite ve boyut
+Daha önce yalnız STT ile tamamlanmış kayıtlar otomatik olarak yeniden özetlenmez; bekleyen işler yeniden deneme kapsamındadır. Çıktı dosyalarını taşımak yerine klasör ayarını değiştirirseniz bekleyen iş yeni metin klasöründe STT'yi yeniden çalıştırabilir.
 
-Çıktı 48 kHz, stereo, AAC-LC ses içeren `.m4a` dosyasıdır. Diskte ara WAV dosyası oluşturulmaz. Bellek kullanımı kayıt süresiyle büyümez; her cihaz için en fazla üç saniyelik ses tamponu ayrılır.
+## Mikrofon sesi
 
-| Kalite | Yaklaşık 1 saatlik boyut | Kullanım |
-| --- | --- | --- |
-| 128 kb/sn | 58 MB | Konuşma ve toplantı |
-| 160 kb/sn | 72 MB | Konuşma ve müzik için dengeli |
-| 192 kb/sn (varsayılan) | 86 MB | Müzik için daha yüksek kalite |
+Varsayılan açık **Mikrofon konuşma iyileştirme**, yalnız mikrofon kanalına uygulanır:
 
-Değerler ondalık MB olarak hesaplanmıştır; kapsayıcı ek yükü nedeniyle küçük farklılıklar olabilir. OBS'te benzer AAC ayarlarıyla kullanılan kodlama sınıfındadır; kaynak cihazı, mikrofon ve ortam kalitesi sonucu etkiler. Gürültü giderme, yankı engelleme veya OBS eklentileri içermez.
+- 90 Hz altındaki uğultuyu ve 10 kHz üstündeki tiz gürültüyü süzer.
+- Sessiz bölümlerde yumuşak bir expander ile düşük seviyeli arka planı azaltır.
+- Konuşmayı en fazla 3 kat yükselten kontrollü seviyeleme uygular; gürültü düzeyindeki sesi yükseltmez.
+- Stereo kanalları birlikte kontrol eder, ani tepe seviyelerini sınırlar.
 
-## Kapsam ve cihazlar
+Bu, yankı giderme veya kaynak ayırma modeli değildir. Konuşma sırasında yüksek çevre gürültüsünü bütünüyle kaldıramaz. Çok kısık konuşmada expander etkisini gerçek mikrofonunuzla karşılaştırın. Ayardan kapatıp kaydedebilirsiniz; değişiklik sonraki kayıtta uygulanır. Mikrofon konumu, cihazın Windows giriş seviyesi ve birden çok mikrofon seçimi sonucu etkiler. Sinyal testleri uğultu/gürültü azalmasını ve düşük seviyeli konuşmanın güçlenmesini doğrular; gerçek donanımda dinleme testi ayrıca yapılmalıdır.
 
-- Her işaretli çıkışın **tüm sesi** alınır. Uygulama bazlı ayırma yapılmaz. Aynı çıkıştaki YouTube ve Teams birlikte kaydedilir. Windows ses mikserinden uygulamaların çıkışını kontrol edin.
-- Kaynaklar tek stereo dosyada birleştirilir; ayrı düzenlenebilir çok kanallı iz dosyaları üretilmez. Çok kanallı hoparlör çıkışları stereo olarak birleştirilir.
-- Farklı örnekleme hızları 48 kHz'e dönüştürülür. Bağımsız cihaz saatleri donanımsal olarak senkron değildir; uzun kayıtlardaki kayma ve cihaz gecikmeleri Windows üzerinde ayrıca doğrulanmalıdır.
-- **Otomatik mod:** Cihaz listesi yaklaşık her saniye güncellenir; kayıt sırasında bağlanan tüm çıkışlar ve mikrofonlar kayda eklenir. Yavaş uygulama/oturum taraması ayrı yürür; mevcut kaynaklarla kaydı başlatmayı engellemez. Açılışta cihaz listesi henüz okunuyorsa başlatma isteği kaybolmaz; liste hazır olduğunda aynı tıklama ile devam eder. Çıkarılan cihazlar kayıttan kaldırılır; kalan kaynaklar aynı dosyaya devam eder. Tüm kaynaklar kaybolursa dosyaya sessizlik yazılır ve yeniden bağlananlar eklenir. Yeni bir cihazdaki ilk yaklaşık bir saniyelik ses kaçabilir. **Elle mod:** Seçim kayıt süresince sabittir; cihaz kaybında kayıt hata ile durur.
-- Aynı fiziksel sesi hem sanal bir çıkıştan hem gerçek çıkıştan yakalamak çift sese neden olabilir. Hoparlör sesinin mikrofona da girmesini azaltmak için kulaklık kullanın.
-- Windows Ayarları → Gizlilik ve güvenlik → Mikrofon bölümünde masaüstü uygulamalarına mikrofon erişimini açın. Windows N sürümlerinde AAC için Media Feature Pack gerekebilir. Korumalı içerikler veya özel sürücüler loopback yakalamayı engelleyebilir.
-- Kaydederken uygulamayı zorla kapatmayın; uykuya geçmeyin veya ses cihazını değiştirmeyin. Tamamlanmamış dosyalar `.partial.m4a` adıyla kalır; çökme veya disk hatası sonrasında oynatılabilecekleri garanti edilmez. Başarılı kapanışta dosya normal `.m4a` adına çevrilir.
-- Kayıtlar otomatik bölünmez; klasörde yeterli boş alan bulunmalıdır.
+## Derleme ve test
 
-## Kaynaktan derleme
-
-### Visual Studio ile açma
-
-Windows'ta güncel **Visual Studio 2022** (en az 17.8), **.NET masaüstü geliştirme** iş yükü ve **.NET 8 SDK** gerekir. Visual Studio Installer'dan iş yükünü ekleyebilirsiniz; depodaki `.vsconfig` dosyası da gereken iş yükünü belirtir.
-
-1. GitHub'dan indirdiğiniz ZIP'i bir klasöre çıkartın; ZIP'in içinden doğrudan açmayın.
-2. Ana klasördeki **`Vocrec.sln`** dosyasını açın.
-3. NuGet paketlerinin geri yüklenmesini bekleyin. Gerekirse çözüme sağ tıklayıp **NuGet Paketlerini Geri Yükle / Restore NuGet Packages** seçin; ilk geri yükleme internet bağlantısı gerektirir.
-4. Çözüm Gezgini'nde **`SesKayit`** projesine sağ tıklayıp **Başlangıç Projesi Olarak Ayarla / Set as Startup Project** seçin. Bu proje `App/SesKayit.csproj` dosyasıdır; test veya ekran görüntüsü projesini başlangıç projesi yapmayın.
-5. **F5** ile hata ayıklayarak, **Ctrl+F5** ile normal çalıştırın.
-
-Çözüm uygulamayı, ortak ses motorunu, iki test projesini ve ekran görüntüsü aracını birlikte içerir. Çözüm yapılandırmaları `Debug | Any CPU` ve `Release | Any CPU` olarak tanımlıdır; indirilebilir EXE ayrıca Windows x64 için yayınlanır.
-
-### Komut satırı ile derleme
-
-.NET 8 SDK gerekir. PowerShell'de proje klasöründen:
+.NET 8 SDK, Windows x64:
 
 ```powershell
-dotnet build Vocrec.sln -c Release
+dotnet build Vocrec.sln -c Release -warnaserror
 dotnet test Tests/SesKayit.Tests.csproj -c Release
-dotnet publish App/SesKayit.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=None -p:DebugSymbols=false -o dist/win-x64
-```
-
-`Core` platformdan bağımsız karıştırıcıyı, `App` Windows arayüzü/WASAPI/AAC motorunu, `Tests` ses işleme testlerini, `WindowsTests` Windows AAC entegrasyon testlerini içerir. Derleme sırasında NAudio 2.2.1 NuGet'ten alınır. Ayrı FFmpeg kurulumu gerekmez.
-
-## GitHub Actions ile test ve EXE paketi
-
-Bu klasörün **içeriğini** (`App`, `Core`, `Tests`, `WindowsTests` ve gizli `.github` klasörü dahil) GitHub deposunun köküne koyun. İş akışı `.github/workflows/windows.yml` dosyasıdır; dosyaları depoda fazladan bir `SesKayit/` alt klasörüne yerleştirmeyin.
-
-Her push ve pull request Windows Server 2022 üzerinde şu adımları çalıştırır:
-
-1. Karıştırıcı, dinamik kaynak değiştirme ve otomatik seçim testleri çalışır.
-2. Windows üzerinde yavaş veya tamamlanmayan uygulama taraması sırasında ilk tıklama, bekleyen ilk cihaz listesi ve yinelenen tıklamaların tek kayıt oluşturması da gerçek WinForms akışıyla, ses donanımı gerektirmeyen kayıt oturumu kullanılarak test edilir. Süre sayacının ses kareleriyle ilerlemesi, durdurmada sabit kalması, yeniden başlatmada sıfırlanması ve %100/%125/%150/%200 yazı büyütmelerinde süre/başlık metninin kırpılmaması kontrol edilir. Windows Media Foundation ile 128, 160 ve 192 kb/sn için üç AAC testi çalışır. İki yapay ses kaynağı karıştırılarak ikişer saniyelik M4A dosyaları oluşturulur. Dosya yeniden açılır; stereo/48 kHz biçimi, süre, yaklaşık boyut ve iki kaynak frekansının da her iki kanalda bulunması kontrol edilir. Türkçe karakter ve boşluk içeren dosya yolu da denenir. AAC yoksa test başarısız olur; atlanmaz.
-3. Testler başarılıysa Windows x64 için .NET kurulumu gerektirmeyen tek EXE hazırlanır. Yayın derlemesindeki uyarılar hata kabul edilir.
-4. EXE, kullanım kılavuzu, lisanslar, EXE'nin SHA256 özeti ve derlenen commit bilgisi **SesKayit-Windows-x64** artifact'ına eklenir. Test raporları ve yapay ses örnekleri, önceki adım başarısız olsa da **Windows-test-results** artifact'ına yüklenmeye çalışılır. Dosyalar 14 gün saklanır.
-
-GitHub'da **Actions → Windows build and audio tests → ilgili çalışma → Artifacts → SesKayit-Windows-x64** yolundan paketi indirin. ZIP'i çıkartıp `SesKayit.exe` dosyasını açın. Elle başlatmak için aynı iş akışının **Run workflow** düğmesini kullanın. Bu işlem GitHub Release yayınlamaz; yalnızca çalışma çıktısı üretir. Standart GitHub Actions kullanım kotası geçerlidir.
-
-Windows AAC testlerini kendi bilgisayarınızda çalıştırmak için:
-
-```powershell
 dotnet test WindowsTests/SesKayit.WindowsTests.csproj -c Release
+dotnet publish App/SesKayit.csproj -c Release -r win-x64 --self-contained true -o dist/win-x64
 ```
 
-Bu iş akışı gerçek mikrofon/loopback cihazlarını, masaüstü arayüzünü, Teams/YouTube yakalamayı veya uzun kayıtta cihaz senkronunu test etmez. Bunlar aşağıdaki yerel testleri gerektirir. İş akışının eklenmesi, GitHub üzerinde başarıyla çalıştığı anlamına gelmez; ilk sonucu Actions sayfasından kontrol edin.
+Model dosyalarını çıktıdaki `models/balbal-v2-manas` klasörüne ekleyin. GitHub Actions Windows iş akışı test edip tüm bağımlılıkları içeren `Vocrec2-Windows-x64` paketini üretir; model ağırlıkları dahil edilmez.
 
-## Doğrulama
+Bu geliştirme ortamında Linux üzerinden tüm çözüm Windows hedefiyle derlenebilir ve platform bağımsız testler çalıştırılır. Windows AAC, WinForms ve gerçek STT/model testi Windows ortamı ve model dosyaları gerektirir. Qwen isteği sahte HTTP servisiyle doğrulanır; gerçek servis henüz sağlanmamıştır.
 
-Linux üzerinde Windows x64 paketi çapraz derlendi ve karıştırıcı testleri çalıştırıldı. Windows arayüzü, WASAPI cihazları ve Media Foundation AAC kodlayıcısı bu ortamda çalıştırılamadı. İlk gerçek kullanım öncesi Windows'ta:
+## Kaynak ve lisanslar
 
-1. YouTube oynatırken mikrofonla konuşup 30 saniyelik kayıt alın. Dosyayı açıp iki sesi de dinleyin; son sözcüğün kesilmediğini kontrol edin.
-2. Teams ayrı çıkış kullanıyorsa iki çıkışı ve mikrofonu seçip her birinin kayda girdiğini kontrol edin.
-3. Klasör, üç kalite seçeneği, uzun kayıt senkronu ve pencereyi kapatarak kaydetmeyi kontrol edin.
-4. Bir test kaydında cihazı çıkartın; hata ve kaydedilen bölümün davranışını kontrol edin.
-
-Paket kod imzalı değildir. Windows'ta yayıncı kimliği doğrulanmış bir uygulama olarak görünmez.
+Temel kayıt uygulaması: https://github.com/hakancuraci/vocrec (MIT).
+STT kaynakları ve taşınan çalıştırma dosyaları: https://github.com/hakancuraci/trslocalwin (`vendor/trslocalwin/UPSTREAM.md`). Balbal Apache-2.0; model ağırlıkları kendi Community License koşullarındadır. FFmpeg GPL ve diğer üçüncü taraf bildirimleri `vendor/trslocalwin/portable-assets/licenses` ve `vendor/trslocalwin/native/licenses` altında korunmuştur. Dağıtımda bu bildirimleri koruyun.

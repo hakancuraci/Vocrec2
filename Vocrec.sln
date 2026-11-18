@@ -1,4 +1,4 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
@@ -12,6 +12,14 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SesKayit.WindowsTests", "WindowsTests\SesKayit.WindowsTests.csproj", "{A7ACA3F3-7F10-44C2-A2D5-058E402BA224}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SesKayit.Screenshot", "Screenshot\SesKayit.Screenshot.csproj", "{230CFBC7-3E52-4B06-B9FD-9572E91C3AD4}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "vendor", "vendor", "{98DF69ED-41E4-43BA-9406-9388D754471C}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "trslocalwin", "trslocalwin", "{674603ED-A4E8-479F-B802-6097554E87DC}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Balbal", "vendor\trslocalwin\Balbal\Balbal.csproj", "{C0AF78C2-F149-4E7B-890E-CEAB44E1A110}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TrsLocal.Core", "vendor\trslocalwin\TrsLocal.Core\TrsLocal.Core.csproj", "{41F92E40-4A6D-4163-94F2-095750BC4DE4}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -42,5 +50,18 @@ Global
 		{230CFBC7-3E52-4B06-B9FD-9572E91C3AD4}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{230CFBC7-3E52-4B06-B9FD-9572E91C3AD4}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{230CFBC7-3E52-4B06-B9FD-9572E91C3AD4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C0AF78C2-F149-4E7B-890E-CEAB44E1A110}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C0AF78C2-F149-4E7B-890E-CEAB44E1A110}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C0AF78C2-F149-4E7B-890E-CEAB44E1A110}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C0AF78C2-F149-4E7B-890E-CEAB44E1A110}.Release|Any CPU.Build.0 = Release|Any CPU
+		{41F92E40-4A6D-4163-94F2-095750BC4DE4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{41F92E40-4A6D-4163-94F2-095750BC4DE4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{41F92E40-4A6D-4163-94F2-095750BC4DE4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{41F92E40-4A6D-4163-94F2-095750BC4DE4}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{674603ED-A4E8-479F-B802-6097554E87DC} = {98DF69ED-41E4-43BA-9406-9388D754471C}
+		{C0AF78C2-F149-4E7B-890E-CEAB44E1A110} = {674603ED-A4E8-479F-B802-6097554E87DC}
+		{41F92E40-4A6D-4163-94F2-095750BC4DE4} = {674603ED-A4E8-479F-B802-6097554E87DC}
 	EndGlobalSection
 EndGlobal

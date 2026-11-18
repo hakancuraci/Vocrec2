@@ -61,11 +61,26 @@ jobs:
           -p:DebugType=None -p:DebugSymbols=false
           -warnaserror -o dist/win-x64
 
+      - name: Verify STT runtime layout
+        run: |
+          $required = @(
+            'SesKayit.exe', 'balbal_native.dll', 'tools/ffmpeg/ffmpeg.exe',
+            '_internal/balbal/_native/balbal_ops_v2.dll',
+            '_internal/balbal/_native/balbal_ops_v3.dll',
+            '_internal/balbal/_native/balbal_ops_v4.dll',
+            'msvcp140.dll', 'vcruntime140.dll', 'vcruntime140_1.dll',
+            'configs/balbal-v2-manas/decoder.json', 'licenses/trslocalwin/LICENSE'
+          )
+          foreach ($file in $required) {
+            if (!(Test-Path "dist/win-x64/$file")) { throw "Missing STT runtime file: $file" }
+          }
+
       - name: Prepare download package
         run: |
           $ErrorActionPreference = 'Stop'
           $package = New-Item -ItemType Directory -Force dist/package
-          Copy-Item dist/win-x64/SesKayit.exe $package
+          Copy-Item dist/win-x64/* $package -Recurse
+          New-Item -ItemType Directory -Force "$package/models/balbal-v2-manas" | Out-Null
           Copy-Item README.md, LICENSE, NAudio-LICENSE.txt $package
           Copy-Item Licenses $package -Recurse
           $hash = (Get-FileHash dist/package/SesKayit.exe -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -80,7 +95,7 @@ jobs:
       - name: Upload Windows download
         uses: actions/upload-artifact@v4
         with:
-          name: SesKayit-Windows-x64
+          name: Vocrec2-Windows-x64
           path: dist/package/
           if-no-files-found: error
           retention-days: 14

@@ -33,13 +33,13 @@ public sealed partial class MainForm : Form
     private IRecordingSession? session;
     private bool busy, closingAllowed;
     private string? lastFile;
-    private readonly string settingsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SesKayit", "settings.json");
+    private readonly string settingsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Vocrec2", "settings.json");
     private Settings settings = new();
 
     public MainForm() : this(
         () => Task.Run(AudioDeviceCatalog.Read),
         () => Task.Run(AudioActivityMonitor.Scan),
-        request => new RecordingSession(request.Sources, request.Folder, request.Bitrate, request.SystemGain, request.MicGain, request.Automatic))
+        request => new RecordingSession(request.Sources, request.Folder, request.Bitrate, request.SystemGain, request.MicGain, request.Automatic, request.EnhanceMicrophone))
     { }
 
     internal MainForm(Func<Task<ObservedDevice[]>> readDevices, Func<Task<ActivitySnapshot>> readActivity,
@@ -49,11 +49,12 @@ public sealed partial class MainForm : Form
         this.readActivity = readActivity;
         this.createRecording = createRecording;
         if (settingsFile != null) settingsPath = settingsFile;
-        Text = "vocrec · Ses kayıt stüdyosu";
+        Text = "Vocrec2 · Ses kayıt stüdyosu";
         BackColor = Bg; ForeColor = StudioTheme.Ink; Font = new Font("Segoe UI", 10);
         FormBorderStyle = FormBorderStyle.None;
         MinimumSize = new Size(960, 720); Size = new Size(1020, 760); StartPosition = FormStartPosition.CenterScreen;
         BuildLayout();
+        InitializeProcessingControls();
         browse.Click += (_, _) =>
         {
             using var dialog = new FolderBrowserDialog { InitialDirectory = folder.Text, Description = "Ses kayıtlarının kaydedileceği klasörü seçin", UseDescriptionForTitle = true };
@@ -80,7 +81,13 @@ public sealed partial class MainForm : Form
             if (busy) { e.Cancel = true; return; }
             if (session != null)
             {
-                e.Cancel = true; await StopAsync(); closingAllowed = true; Close();
+                e.Cancel = true; await StopAsync(); busy = true; start.Enabled = false; await processingTask; closingAllowed = true; Close();
+            }
+            else if (!processingTask.IsCompleted)
+            {
+                e.Cancel = true; busy = true; start.Enabled = false;
+                status.Text = "Metin/özet işlemleri tamamlanıyor…";
+                await processingTask; closingAllowed = true; SaveSettings(); Close();
             }
             else SaveSettings();
         };
@@ -121,7 +128,7 @@ public sealed partial class MainForm : Form
             var selected = SelectedSources();
             if (selected.Length == 0) throw new InvalidOperationException("Kaydedilecek ses kaynağı yok. Bir ses çıkışı veya mikrofon bağlayın ya da elle kaynak seçin.");
             SaveSettings();
-            var request = new RecordingRequest(selected, path, bitrate, sg, mg, auto);
+            var request = new RecordingRequest(selected, path, bitrate, sg, mg, auto, settings.Processing.EnhanceMicrophone);
             session = await Task.Run(() => createRecording(request));
             lastFile = null; elapsed.Text = "00:00:00"; status.Text = "● Kayıt yapılıyor"; recordState.Text = "● KAYITTA"; timer.Start(); stop.Enabled = true;
         }
@@ -142,6 +149,7 @@ public sealed partial class MainForm : Form
             ShowError(new IOException(ex.Message + (lastFile is null ? $"\nKısmi dosya (tamamlanmamış olabilir):\n{current.PartialPath}" : ""), ex));
         }
         finally { DisplayDuration(current.Mixer.Duration); current.Dispose(); session = null; busy = false; SetRecording(false); systemMeter.Value = micMeter.Value = 0; SaveSettings(); }
+        if (lastFile != null && File.Exists(lastFile)) QueueProcessing(lastFile, settings.Processing);
     }
 
     private Task<ObservedDevice[]> ReadDevicesAsync(bool refresh = false)
@@ -252,6 +260,8 @@ public sealed partial class MainForm : Form
     private void LoadSettings()
     {
         try { if (File.Exists(settingsPath)) settings = JsonSerializer.Deserialize<Settings>(File.ReadAllText(settingsPath)) ?? new(); } catch { settings = new(); }
+        settings.Processing ??= new();
+        LoadProcessingControls(settings.Processing);
         folder.Text = settings.Folder; hints.SetToolTip(folder, folder.Text); automatic.Checked = settings.Automatic;
         // Preserve the previous 192 kb/s default when loading older index-based settings.
         int preferredBitrate = settings.Bitrate ?? (settings.Quality == 0 ? 128000 : 192000);
@@ -263,9 +273,9 @@ public sealed partial class MainForm : Form
         try
         {
             settings = new Settings { Folder = folder.Text, Automatic = automatic.Checked, Bitrate = Bitrate(), SystemGain = systemGain.Value, MicGain = micGain.Value,
+                Processing = settings.Processing,
                 Devices = outputs.CheckedItems.Cast<DeviceChoice>().Concat(microphones.CheckedItems.Cast<DeviceChoice>()).Select(d => d.Id).ToArray() };
-            Directory.CreateDirectory(Path.GetDirectoryName(settingsPath)!);
-            File.WriteAllText(settingsPath, JsonSerializer.Serialize(settings));
+            PersistSettings();
         }
         catch { /* Saving preferences must not interrupt a recording. */ }
     }
@@ -276,6 +286,7 @@ public sealed partial class MainForm : Form
     private sealed class Settings
     {
         public Settings() { }
+        public PostProcessingSettings Processing { get; set; } = new();
         public bool Automatic { get; set; } = true;
         public string Folder { get; set; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyMusic), "SesKayit");
         public int Quality { get; set; } = 1;

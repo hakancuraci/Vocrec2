@@ -1,8 +1,17 @@
-Yerel doğrulama (Linux):
-- Windows x64 Release EXE önceden derlendi.
-- Karıştırıcı testleri: 9 başarılı, 0 başarısız.
-- Yeni WindowsTests projesi: 0 hata, 0 uyarı ile derlendi.
-- GitHub Actions workflow: actionlint ve dosya yolu kontrolleri başarılı.
-- Üç Windows AAC entegrasyon testi Linux üzerinde çalıştırılmadı.
-- Güncel Windows CI sonucu için GitHub Actions çalışma sayfasını kontrol edin.
-- Gerçek mikrofon/loopback ve arayüz testleri yerel Windows gerektirir.
+Vocrec2 doğrulama
+
+- .NET 8.0.428 / Linux geliştirme ortamı.
+- Windows hedefli çözüm Release derlemesi: 0 hata, 0 uyarı.
+- Platform bağımsız testler: 29/29 geçti.
+- Testler: mevcut mixer/kaynak seçimi; mikrofon uğultu, arka plan,
+  konuşma kazancı, stereo ve tepe sınırı; STT metninin LLM öncesi
+  yazılması; LLM istek/yanıt formatı; HTTP hatasında metnin korunması;
+  URL doğrulama ve ayarların JSON kalıcılığı.
+- Windows x64 bağımsız paket üretildi; gerekli STT/FFmpeg dosyaları
+  paket yerleşiminde kontrol edilir.
+- Bu ortamda Windows AAC/WinForms testleri çalıştırılmadı. GitHub Actions
+  bunları Windows runner üzerinde çalıştıracak şekilde yapılandırıldı.
+- Manas model ağırlıkları yok; gerçek STT ve fiziksel mikrofon dinleme
+  testi yapılmadı. Qwen servisi sağlanmadığından REST testleri sahtedir.
+- GitHub yazma denemesi 403 ile reddedildi; uzak Vocrec2 deposuna
+  aktarımın tamamlandığı iddia edilmez.
