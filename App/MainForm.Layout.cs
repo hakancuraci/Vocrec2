@@ -4,6 +4,8 @@ namespace SesKayit;
 
 public sealed partial class MainForm
 {
+    private Action? updateTextLayout;
+
     private void BuildLayout()
     {
         SuspendLayout();
@@ -17,8 +19,10 @@ public sealed partial class MainForm
 
         var header = new Panel { Dock = DockStyle.Fill, BackColor = Bg };
         var mark = new BrandMark { Location = new Point(0, 13) }; header.Controls.Add(mark);
-        var name = Heading("vocrec", 25); name.Dock = DockStyle.None; name.Bounds = new Rectangle(56, 0, 260, 44); header.Controls.Add(name);
-        var tagline = LabelText("Sistem sesi ve mikrofon. Tek bir kayıtta.", 9); tagline.Dock = DockStyle.None; tagline.Bounds = new Rectangle(58, 45, 400, 20); header.Controls.Add(tagline);
+        var name = Heading("vocrec", 25); name.Dock = DockStyle.None; name.AutoSize = true; name.AutoEllipsis = false;
+        name.AccessibleName = "Uygulama başlığı"; name.Padding = new Padding(0, 3, 0, 3); header.Controls.Add(name);
+        var tagline = LabelText("Sistem sesi ve mikrofon. Tek bir kayıtta.", 9); tagline.Dock = DockStyle.None; tagline.AutoSize = true; tagline.AutoEllipsis = false;
+        tagline.AccessibleName = "Uygulama açıklaması"; header.Controls.Add(tagline);
         var tag = LabelText("SES KAYIT STÜDYOSU\n48 kHz stereo  /  AAC", 9); tag.TextAlign = ContentAlignment.MiddleRight;
         tag.Dock = DockStyle.Right; tag.Width = 205; header.Controls.Add(tag); root.Controls.Add(header, 0, 0);
 
@@ -49,12 +53,14 @@ public sealed partial class MainForm
         var recordingGrid = Grid(1, 2);
         recordingGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); recordingGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, 22));
         var transport = Grid(5, 1);
-        transport.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 190));
+        transport.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         transport.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         transport.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 68));
         transport.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 146));
         transport.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 174));
         elapsed.Font = new Font("Consolas", 27); elapsed.ForeColor = StudioTheme.Ink;
+        elapsed.AutoSize = true; elapsed.AutoEllipsis = false;
+        elapsed.Padding = new Padding(4, 2, 18, 2); elapsed.AccessibleName = "Kayıt süresi";
         transport.Controls.Add(elapsed, 0, 0);
         recordState.ForeColor = StudioTheme.Muted; transport.Controls.Add(recordState, 1, 0);
         refresh.Font = new Font("Segoe UI", 9); refresh.Margin = new Padding(0, 5, 8, 5); transport.Controls.Add(refresh, 2, 0);
@@ -65,6 +71,30 @@ public sealed partial class MainForm
         hints.SetToolTip(browse, "Yeni kayıtların kaydedileceği klasörü seçer.");
         hints.SetToolTip(open, "Seçili kayıt klasörünü Dosya Gezgini’nde açar. Kayıt konumunu değiştirmez.");
         hints.SetToolTip(automatic, "Tüm ses çıkışlarını ve mikrofonları seçer. Uygulama taraması kayıt başlatmayı engellemez.");
+        bool updating = false;
+        void FitTextLayout()
+        {
+            if (updating || IsDisposed) return;
+            updating = true;
+            try
+            {
+                name.Location = new Point(56, 5);
+                tagline.Location = new Point(58, name.Bottom + 3);
+                int headerHeight = Math.Max(72, tagline.Bottom + 9);
+                if (root.RowStyles[0].Height != headerHeight) root.RowStyles[0].Height = headerHeight;
+                mark.Top = Math.Max(5, (headerHeight - mark.Height) / 2);
+                int footerHeight = Math.Max(108, elapsed.PreferredHeight + status.PreferredHeight + recording.Padding.Vertical + recording.Margin.Vertical + 10);
+                if (root.RowStyles[3].Height != footerHeight) root.RowStyles[3].Height = footerHeight;
+            }
+            finally { updating = false; }
+        }
+        updateTextLayout = FitTextLayout;
+        name.SizeChanged += (_, _) => FitTextLayout();
+        tagline.SizeChanged += (_, _) => FitTextLayout();
+        elapsed.FontChanged += (_, _) => FitTextLayout();
+        status.FontChanged += (_, _) => FitTextLayout();
+        Shown += (_, _) => FitTextLayout();
+        FitTextLayout();
         ResumeLayout(true);
     }
 
@@ -141,6 +171,12 @@ public sealed partial class MainForm
     private static Label Heading(string text, int size = 12)
     {
         var label = LabelText(text, size); label.ForeColor = StudioTheme.Ink; label.Font = new Font("Segoe UI", size, FontStyle.Bold); return label;
+    }
+
+    protected override void OnDpiChanged(DpiChangedEventArgs e)
+    {
+        base.OnDpiChanged(e);
+        updateTextLayout?.Invoke();
     }
 
     private void AddWindowChrome()

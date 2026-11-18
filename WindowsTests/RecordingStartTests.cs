@@ -88,6 +88,75 @@ public class RecordingStartTests
         finally { catalog.TrySetResult(Devices); if (Directory.Exists(directory)) Directory.Delete(directory, true); }
     });
 
+    [Fact]
+    public Task ElapsedCounterTracksMediaFramesFreezesAfterStopAndResetsOnRestart() => OnUiThread(async () =>
+    {
+        FakeSession? recording = null;
+        string directory = Path.Combine(Path.GetTempPath(), "vocrec-clock-" + Guid.NewGuid().ToString("N"));
+        using var form = new MainForm(() => Task.FromResult(Devices), () => Task.FromResult(EmptyActivity),
+            request => recording = new FakeSession(request), Path.Combine(directory, "settings.json"));
+        try
+        {
+            var clock = Assert.IsType<Label>(Descendants(form).Single(c => c.AccessibleName == "Kayıt süresi"));
+            await form.StartAsync();
+            Assert.Equal("00:00:00", clock.Text);
+            var mixer = recording!.Mixer;
+            await Task.Run(() => { var pcm = new byte[48000 * 4 * 2]; Assert.Equal(pcm.Length, mixer.Read(pcm, 0, pcm.Length)); });
+            await form.RefreshRecordingStatusAsync();
+            Assert.Equal("00:00:02", clock.Text);
+            await form.StopAsync();
+            await Task.Delay(1100);
+            Assert.Equal("00:00:02", clock.Text);
+            await form.StartAsync();
+            Assert.Equal("00:00:00", clock.Text);
+            await form.StopAsync();
+        }
+        finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
+    });
+
+    [Theory]
+    [InlineData(1f)]
+    [InlineData(1.25f)]
+    [InlineData(1.5f)]
+    [InlineData(2f)]
+    public Task LargerClockAndHeaderFontsStayReadableAtMinimumWindowSize(float scale) => OnUiThread(() =>
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "vocrec-layout-" + Guid.NewGuid().ToString("N"));
+        using var form = new MainForm(() => Task.FromResult(Devices), () => Task.FromResult(EmptyActivity),
+            request => new FakeSession(request), Path.Combine(directory, "settings.json"));
+        form.ShowInTaskbar = false;
+        form.Show(); form.Size = form.MinimumSize;
+        var controls = Descendants(form).ToArray();
+        var clock = Assert.IsType<Label>(controls.Single(c => c.AccessibleName == "Kayıt süresi"));
+        var title = Assert.IsType<Label>(controls.Single(c => c.AccessibleName == "Uygulama başlığı"));
+        var tagline = Assert.IsType<Label>(controls.Single(c => c.AccessibleName == "Uygulama açıklaması"));
+        using var clockFont = new Font(clock.Font.FontFamily, clock.Font.Size * scale, clock.Font.Style);
+        using var titleFont = new Font(title.Font.FontFamily, title.Font.Size * scale, title.Font.Style);
+        using var taglineFont = new Font(tagline.Font.FontFamily, tagline.Font.Size * scale, tagline.Font.Style);
+        clock.Font = clockFont; title.Font = titleFont; tagline.Font = taglineFont;
+        clock.Text = "123:45:56"; form.PerformLayout();
+        foreach (var label in new[] { clock, title, tagline })
+        {
+            Assert.False(label.AutoEllipsis);
+            Assert.True(label.ClientSize.Width >= label.PreferredSize.Width, $"Text width: {label.AccessibleName} ({scale}) actual={label.ClientSize} preferred={label.PreferredSize}");
+            Assert.True(label.ClientSize.Height >= label.PreferredSize.Height, $"Text height: {label.AccessibleName} ({scale}) actual={label.ClientSize} preferred={label.PreferredSize}");
+            Assert.True(form.ClientRectangle.Contains(form.RectangleToClient(label.RectangleToScreen(label.ClientRectangle))));
+        }
+        Assert.True(tagline.Top >= title.Bottom + 3);
+        form.Close();
+        if (Directory.Exists(directory)) Directory.Delete(directory, true);
+        return Task.CompletedTask;
+    });
+
+    private static IEnumerable<Control> Descendants(Control parent)
+    {
+        foreach (Control child in parent.Controls)
+        {
+            yield return child;
+            foreach (var nested in Descendants(child)) yield return nested;
+        }
+    }
+
     private static Task OnUiThread(Func<Task> assertion)
     {
         var completed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);

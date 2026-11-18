@@ -63,6 +63,12 @@ internal static class Program
         var folder = controls.Single(c => c.AccessibleName == "Seçili kayıt klasörü");
         if (!folder.Visible || !form.ClientRectangle.Contains(form.RectangleToClient(folder.RectangleToScreen(folder.ClientRectangle))))
             throw new InvalidOperationException("Recording folder must stay visible without scrolling.");
+        foreach (var name in new[] { "Kayıt süresi", "Uygulama başlığı", "Uygulama açıklaması" })
+        {
+            var label = (Label)controls.Single(c => c.AccessibleName == name);
+            if (label.AutoEllipsis || label.ClientSize.Width < label.PreferredSize.Width || label.ClientSize.Height < label.PreferredSize.Height)
+                throw new InvalidOperationException($"Text must be shown in full: {name}");
+        }
     }
 
     private static IEnumerable<Control> Descendants(Control parent)

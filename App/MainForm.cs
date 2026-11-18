@@ -73,18 +73,7 @@ public sealed partial class MainForm : Form
         stop.Click += async (_, _) => await StopAsync();
         systemGain.ValueChanged += (_, _) => { if (session != null) Volatile.Write(ref session.Mixer.SystemGain, systemGain.Value / 100f); };
         micGain.ValueChanged += (_, _) => { if (session != null) Volatile.Write(ref session.Mixer.MicrophoneGain, micGain.Value / 100f); };
-        timer.Tick += async (_, _) =>
-        {
-            var current = session;
-            if (current is null || busy) return;
-            elapsed.Text = $"{(int)current.Mixer.Duration.TotalHours:00}:{current.Mixer.Duration.Minutes:00}:{current.Mixer.Duration.Seconds:00}";
-            size.Text = $"{FileSize(current.PartialPath):0.0} MB kaydedildi · {Bitrate() / 1000} kb/sn";
-            systemMeter.Value = Level(current, false); micMeter.Value = Level(current, true);
-            bool limited = Interlocked.Read(ref current.Mixer.LimitedSamples) > 0;
-            peakInfo.Text = limited ? "Tepe sınırına ulaşıldı. Daha temiz ses için seviyeleri azaltın." : "Kayıt sürüyor · seviyeleri canlı ayarlayabilirsiniz.";
-            peakInfo.ForeColor = limited ? Color.FromArgb(255, 196, 110) : Color.Silver;
-            if ((!current.Automatic && current.CaptureError != null) || current.Completion.IsCompleted) await StopAsync();
-        };
+        timer.Tick += async (_, _) => await RefreshRecordingStatusAsync();
         FormClosing += async (_, e) =>
         {
             if (closingAllowed) return;
@@ -98,6 +87,23 @@ public sealed partial class MainForm : Form
         Shown += async (_, _) => { discoveryTimer.Start(); await RefreshChannelsAsync(); };
         UpdateSelectionControls();
     }
+
+    internal async Task RefreshRecordingStatusAsync()
+    {
+        var current = session;
+        if (current is null || busy) return;
+        // Use one media-time snapshot, including when a minute/hour boundary is crossed.
+        var duration = current.Mixer.Duration;
+        DisplayDuration(duration);
+        size.Text = $"{FileSize(current.PartialPath):0.0} MB kaydedildi · {Bitrate() / 1000} kb/sn";
+        systemMeter.Value = Level(current, false); micMeter.Value = Level(current, true);
+        bool limited = Interlocked.Read(ref current.Mixer.LimitedSamples) > 0;
+        peakInfo.Text = limited ? "Tepe sınırına ulaşıldı. Daha temiz ses için seviyeleri azaltın." : "Kayıt sürüyor · seviyeleri canlı ayarlayabilirsiniz.";
+        peakInfo.ForeColor = limited ? Color.FromArgb(255, 196, 110) : Color.Silver;
+        if ((!current.Automatic && current.CaptureError != null) || current.Completion.IsCompleted) await StopAsync();
+    }
+
+    private void DisplayDuration(TimeSpan duration) => elapsed.Text = $"{(long)duration.TotalHours:00}:{duration.Minutes:00}:{duration.Seconds:00}";
 
     internal async Task StartAsync()
     {
@@ -135,7 +141,7 @@ public sealed partial class MainForm : Form
             status.Text = "Kayıt hatayla durdu.";
             ShowError(new IOException(ex.Message + (lastFile is null ? $"\nKısmi dosya (tamamlanmamış olabilir):\n{current.PartialPath}" : ""), ex));
         }
-        finally { current.Dispose(); session = null; busy = false; SetRecording(false); systemMeter.Value = micMeter.Value = 0; SaveSettings(); }
+        finally { DisplayDuration(current.Mixer.Duration); current.Dispose(); session = null; busy = false; SetRecording(false); systemMeter.Value = micMeter.Value = 0; SaveSettings(); }
     }
 
     private Task<ObservedDevice[]> ReadDevicesAsync(bool refresh = false)

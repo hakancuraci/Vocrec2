@@ -13,6 +13,8 @@ Windows 10/11 x64 için, bilgisayar çıkışlarını ve mikrofonları aynı and
 
 Ses seviyeleri kayıt sırasında değiştirilebilir. Varsayılan %70 değerleri karışımda taşmayı azaltır. Tepe sınırı uyarısı çıkarsa seviyeleri düşürün. Göstergeler yalnızca kayıt sırasında çalışır. Klasör, kalite, cihaz seçimi ve seviyeler sonraki açılış için saklanır.
 
+Süre göstergesi kayda işlenen ses karelerinden hesaplanır ve `saat:dakika:saniye` biçiminde tam gösterilir; metin `…` ile kısaltılmaz. Durdurulduğunda son kayıt süresi kalır; yeni kayıtta sıfırlanır. Süre ve uygulama başlığı alanları yazı ölçüsüne göre boyutlanır.
+
 ## Canlı kanallar ve otomatik algılama
 
 - Kanal listelerinin altında Windows ses oturumlarının uygulama adları görünür. Örneğin Teams `ms-teams`, YouTube ise `chrome`, `msedge` veya kullandığınız tarayıcının adıyla görünebilir; sekme/site adı her zaman belirlenemez.
@@ -79,7 +81,7 @@ Bu klasörün **içeriğini** (`App`, `Core`, `Tests`, `WindowsTests` ve gizli `
 Her push ve pull request Windows Server 2022 üzerinde şu adımları çalıştırır:
 
 1. Karıştırıcı, dinamik kaynak değiştirme ve otomatik seçim testleri çalışır.
-2. Windows üzerinde yavaş veya tamamlanmayan uygulama taraması sırasında ilk tıklama, bekleyen ilk cihaz listesi ve yinelenen tıklamaların tek kayıt oluşturması da gerçek WinForms akışıyla, ses donanımı gerektirmeyen kayıt oturumu kullanılarak test edilir. Windows Media Foundation ile 128, 160 ve 192 kb/sn için üç AAC testi çalışır. İki yapay ses kaynağı karıştırılarak ikişer saniyelik M4A dosyaları oluşturulur. Dosya yeniden açılır; stereo/48 kHz biçimi, süre, yaklaşık boyut ve iki kaynak frekansının da her iki kanalda bulunması kontrol edilir. Türkçe karakter ve boşluk içeren dosya yolu da denenir. AAC yoksa test başarısız olur; atlanmaz.
+2. Windows üzerinde yavaş veya tamamlanmayan uygulama taraması sırasında ilk tıklama, bekleyen ilk cihaz listesi ve yinelenen tıklamaların tek kayıt oluşturması da gerçek WinForms akışıyla, ses donanımı gerektirmeyen kayıt oturumu kullanılarak test edilir. Süre sayacının ses kareleriyle ilerlemesi, durdurmada sabit kalması, yeniden başlatmada sıfırlanması ve %100/%125/%150/%200 yazı büyütmelerinde süre/başlık metninin kırpılmaması kontrol edilir. Windows Media Foundation ile 128, 160 ve 192 kb/sn için üç AAC testi çalışır. İki yapay ses kaynağı karıştırılarak ikişer saniyelik M4A dosyaları oluşturulur. Dosya yeniden açılır; stereo/48 kHz biçimi, süre, yaklaşık boyut ve iki kaynak frekansının da her iki kanalda bulunması kontrol edilir. Türkçe karakter ve boşluk içeren dosya yolu da denenir. AAC yoksa test başarısız olur; atlanmaz.
 3. Testler başarılıysa Windows x64 için .NET kurulumu gerektirmeyen tek EXE hazırlanır. Yayın derlemesindeki uyarılar hata kabul edilir.
 4. EXE, kullanım kılavuzu, lisanslar, EXE'nin SHA256 özeti ve derlenen commit bilgisi **SesKayit-Windows-x64** artifact'ına eklenir. Test raporları ve yapay ses örnekleri, önceki adım başarısız olsa da **Windows-test-results** artifact'ına yüklenmeye çalışılır. Dosyalar 14 gün saklanır.
 
