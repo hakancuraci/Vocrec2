@@ -27,7 +27,7 @@ public sealed partial class MainForm
         automationGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); automationGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 110));
         automationGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, 21)); automationGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, 17)); automationGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         automationGrid.Controls.Add(Heading("Otomatik kanal keşfi", 11), 0, 0);
-        automationGrid.Controls.Add(LabelText("Ses veren uygulamalar ve mikrofonlar kendiliğinden listelenir.", 9), 0, 1);
+        automationGrid.Controls.Add(LabelText("Tüm ses çıkışları ve mikrofonlar seçili gelir. Tek tıkla kayıt.", 9), 0, 1);
         automationGrid.Controls.Add(LabelText("Teams’te sessize almak yerel mikrofon kaydını durdurmaz.", 8), 0, 2);
         automationGrid.Controls.Add(automatic, 1, 0); automationGrid.SetRowSpan(automatic, 3);
         automationCard.Controls.Add(automationGrid); root.Controls.Add(automationCard, 0, 1);
@@ -37,7 +37,7 @@ public sealed partial class MainForm
         var channels = Grid(1, 2);
         channels.RowStyles.Add(new RowStyle(SizeType.Percent, 50)); channels.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
         channels.Controls.Add(ChannelCard("Bilgisayar sesi", "SİSTEM", "Seçili çıkışlardaki tüm sesler kaydedilir.", outputs, outputApps, systemGain, systemMeter), 0, 0);
-        channels.Controls.Add(ChannelCard("Mikrofonlar", "GİRİŞ", "İletişim mikrofonu ve kullanılan diğer mikrofonlar.", microphones, micApps, micGain, micMeter), 0, 1);
+        channels.Controls.Add(ChannelCard("Mikrofonlar", "GİRİŞ", "Tüm mikrofonlar hazır; elle seçim için otomatik modu kapatın.", microphones, micApps, micGain, micMeter), 0, 1);
         body.Controls.Add(channels, 0, 0);
 
         var settings = Grid(1, 2);
@@ -64,7 +64,7 @@ public sealed partial class MainForm
         recording.Controls.Add(recordingGrid); root.Controls.Add(recording, 0, 3);
         hints.SetToolTip(browse, "Yeni kayıtların kaydedileceği klasörü seçer.");
         hints.SetToolTip(open, "Seçili kayıt klasörünü Dosya Gezgini’nde açar. Kayıt konumunu değiştirmez.");
-        hints.SetToolTip(automatic, "Tüm çıkışları, iletişim mikrofonunu ve diğer uygulamaların kullandığı mikrofonları seçer.");
+        hints.SetToolTip(automatic, "Tüm ses çıkışlarını ve mikrofonları seçer. Uygulama taraması kayıt başlatmayı engellemez.");
         ResumeLayout(true);
     }
 

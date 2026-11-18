@@ -4,7 +4,7 @@ using Xunit;
 public class AutomaticSourcesTests
 {
     [Fact]
-    public void IncludesEveryOutputAndDefaultMicBeforeAnyAppMakesSound()
+    public void IncludesEveryOutputAndEveryMicWithoutWaitingForApplicationActivity()
     {
         var selected = AutomaticSources.Select([
             new("speakers", "Hoparlör", false, false, false),
@@ -12,21 +12,21 @@ public class AutomaticSourcesTests
             new("communication-mic", "Mikrofon", true, true, false),
             new("unused-mic", "Webcam", true, false, false)
         ]);
-        Assert.True(selected.SetEquals(["speakers", "headphones", "communication-mic"]));
+        Assert.True(selected.SetEquals(["speakers", "headphones", "communication-mic", "unused-mic"]));
     }
 
     [Fact]
-    public void IncludesNonDefaultMicWhenAnotherAppOpensIt()
+    public void NonDefaultMicIsSelectedEvenWhenNoOtherAppHasOpenedIt()
     {
         Assert.Contains("teams-mic", AutomaticSources.Select([new("teams-mic", "USB", true, false, true)]));
-        Assert.Empty(AutomaticSources.Select([new("teams-mic", "USB", true, false, false)]));
+        Assert.Contains("teams-mic", AutomaticSources.Select([new("teams-mic", "USB", true, false, false)]));
     }
 
     [Fact]
-    public void RemovesDisconnectedEndpointsAndUsesNewCommunicationDefault()
+    public void FollowsAvailableDeviceSnapshotAndDeduplicatesIds()
     {
         var selected = AutomaticSources.Select([
-            new("old-mic", "Dahili", true, false, false),
+            new("new-mic", "USB", true, false, false),
             new("new-mic", "USB", true, true, false)
         ]);
         Assert.Single(selected); Assert.Contains("new-mic", selected);

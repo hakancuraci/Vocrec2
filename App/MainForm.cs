@@ -13,7 +13,11 @@ public sealed partial class MainForm : Form
     private readonly Label recordState = LabelText("● HAZIR", 9);
     private readonly ToolTip hints = new() { AutoPopDelay = 12000 };
     private readonly System.Windows.Forms.Timer discoveryTimer = new() { Interval = 1000 };
-    private bool scanning, devicesLoaded;
+    private bool refreshingDevices, refreshingActivity, devicesLoaded;
+    private Task<ObservedDevice[]>? deviceRead;
+    private readonly Func<Task<ObservedDevice[]>> readDevices;
+    private readonly Func<Task<ActivitySnapshot>> readActivity;
+    private readonly Func<RecordingRequest, IRecordingSession> createRecording;
     private readonly DevicePicker outputs = new(), microphones = new();
     private readonly TextBox folder = new() { Dock = DockStyle.Fill, ReadOnly = true, BorderStyle = BorderStyle.None, BackColor = StudioTheme.Field, ForeColor = StudioTheme.Ink };
     private readonly ComboBox quality = new() { DropDownStyle = ComboBoxStyle.DropDownList, Dock = DockStyle.Fill };
@@ -26,14 +30,25 @@ public sealed partial class MainForm : Form
     private readonly Label peakInfo = LabelText("Seviyeler kayıt sırasında görünür.");
     private readonly System.Windows.Forms.Timer timer = new() { Interval = 100 };
     private readonly List<Control> configuration = [];
-    private RecordingSession? session;
+    private IRecordingSession? session;
     private bool busy, closingAllowed;
     private string? lastFile;
     private readonly string settingsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SesKayit", "settings.json");
     private Settings settings = new();
 
-    public MainForm()
+    public MainForm() : this(
+        () => Task.Run(AudioDeviceCatalog.Read),
+        () => Task.Run(AudioActivityMonitor.Scan),
+        request => new RecordingSession(request.Sources, request.Folder, request.Bitrate, request.SystemGain, request.MicGain, request.Automatic))
+    { }
+
+    internal MainForm(Func<Task<ObservedDevice[]>> readDevices, Func<Task<ActivitySnapshot>> readActivity,
+        Func<RecordingRequest, IRecordingSession> createRecording, string? settingsFile = null)
     {
+        this.readDevices = readDevices;
+        this.readActivity = readActivity;
+        this.createRecording = createRecording;
+        if (settingsFile != null) settingsPath = settingsFile;
         Text = "vocrec · Ses kayıt stüdyosu";
         BackColor = Bg; ForeColor = StudioTheme.Ink; Font = new Font("Segoe UI", 10);
         FormBorderStyle = FormBorderStyle.None;
@@ -80,31 +95,35 @@ public sealed partial class MainForm : Form
             }
             else SaveSettings();
         };
-        Shown += async (_, _) => { await RefreshChannelsAsync(); if (!IsDisposed) discoveryTimer.Start(); };
+        Shown += async (_, _) => { discoveryTimer.Start(); await RefreshChannelsAsync(); };
         UpdateSelectionControls();
     }
 
-    private async Task StartAsync()
+    internal async Task StartAsync()
     {
         if (busy || session != null) return;
-        if (scanning) { status.Text = "Kaynak taraması tamamlanınca Kaydı başlat’a basın."; return; }
-        var selected = SelectedSources();
-        if (selected.Length == 0) { ShowError(new Exception("En az bir çıkış veya mikrofon seçin.")); return; }
         string path;
         try { if (string.IsNullOrWhiteSpace(folder.Text)) throw new IOException("Kayıt klasörünü seçin."); path = Path.GetFullPath(folder.Text); }
         catch (Exception ex) { ShowError(ex); return; }
-        SaveSettings(); busy = true; SetRecording(true); stop.Enabled = false; status.Text = "Ses kaynakları açılıyor…";
+        busy = true; SetRecording(true); stop.Enabled = false; recordState.Text = "● HAZIRLANIYOR"; status.Text = "Ses kaynakları açılıyor…";
         int bitrate = Bitrate(); float sg = systemGain.Value / 100f, mg = micGain.Value / 100f; bool auto = automatic.Checked;
         try
         {
-            session = await Task.Run(() => new RecordingSession(selected, path, bitrate, sg, mg, auto));
-            lastFile = null; elapsed.Text = "00:00:00"; status.Text = "● Kayıt yapılıyor"; timer.Start(); stop.Enabled = true;
+            // Keep this click pending only for endpoint enumeration, never for application scans.
+            // If endpoints are already displayed, start immediately even during a refresh.
+            if (!devicesLoaded) ApplyDevices(await ReadDevicesAsync());
+            var selected = SelectedSources();
+            if (selected.Length == 0) throw new InvalidOperationException("Kaydedilecek ses kaynağı yok. Bir ses çıkışı veya mikrofon bağlayın ya da elle kaynak seçin.");
+            SaveSettings();
+            var request = new RecordingRequest(selected, path, bitrate, sg, mg, auto);
+            session = await Task.Run(() => createRecording(request));
+            lastFile = null; elapsed.Text = "00:00:00"; status.Text = "● Kayıt yapılıyor"; recordState.Text = "● KAYITTA"; timer.Start(); stop.Enabled = true;
         }
         catch (Exception ex) { SetRecording(false); status.Text = "Kayıt başlatılamadı."; ShowError(ex); }
         finally { busy = false; }
     }
 
-    private async Task StopAsync()
+    internal async Task StopAsync()
     {
         if (busy || session is null) return;
         busy = true; timer.Stop(); stop.Enabled = false; status.Text = "Dosya tamamlanıyor…";
@@ -119,20 +138,29 @@ public sealed partial class MainForm : Form
         finally { current.Dispose(); session = null; busy = false; SetRecording(false); systemMeter.Value = micMeter.Value = 0; SaveSettings(); }
     }
 
-    private async Task RefreshChannelsAsync()
+    private Task<ObservedDevice[]> ReadDevicesAsync(bool refresh = false)
     {
-        if (scanning || busy || IsDisposed) return;
-        scanning = true;
+        if (deviceRead == null || (deviceRead.IsCompleted && (refresh || deviceRead.IsFaulted || deviceRead.IsCanceled))) deviceRead = readDevices();
+        return deviceRead;
+    }
+
+    private void ApplyDevices(ObservedDevice[] devices)
+    {
+        var chosen = AutomaticSources.Select(devices);
+        UpdateDevices(outputs, devices.Where(d => !d.Microphone), chosen);
+        UpdateDevices(microphones, devices.Where(d => d.Microphone), chosen);
+        devicesLoaded = true;
+    }
+
+    internal async Task RefreshChannelsAsync()
+    {
+        if (refreshingDevices || busy || IsDisposed) return;
+        refreshingDevices = true;
         try
         {
-            var snapshot = await Task.Run(AudioActivityMonitor.Scan);
+            var devices = await ReadDevicesAsync(refresh: true);
             if (IsDisposed || busy) return;
-            var chosen = AutomaticSources.Select(snapshot.Devices);
-            UpdateDevices(outputs, snapshot.Devices.Where(d => !d.Microphone), chosen);
-            UpdateDevices(microphones, snapshot.Devices.Where(d => d.Microphone), chosen);
-            UpdateActivities(outputApps, snapshot.Outputs, "Ses üreten uygulama oturumu bekleniyor…");
-            UpdateActivities(micApps, snapshot.Microphones, "Başka uygulamanın mikrofon oturumu yok.");
-            devicesLoaded = true;
+            ApplyDevices(devices);
             var current = session;
             if (current?.Automatic == true)
             {
@@ -142,10 +170,30 @@ public sealed partial class MainForm : Form
             }
             else if (current == null && lastFile == null)
                 status.Text = automatic.Checked ? "Hazır · Otomatik seçim açık; kayıt için Kaydı başlat'a basın." : "Hazır · Kaynakları elle seçebilirsiniz.";
-            if (snapshot.Warnings.Length > 0) status.Text = snapshot.Warnings[0];
         }
-        catch (Exception ex) { status.Text = "Kaynak tarama hatası: " + ex.Message; }
-        finally { scanning = false; }
+        catch (Exception ex) { status.Text = "Cihaz listesi okunamadı: " + ex.Message; }
+        finally { refreshingDevices = false; }
+        _ = RefreshActivitiesAsync();
+    }
+
+    internal async Task RefreshActivitiesAsync()
+    {
+        if (refreshingActivity || IsDisposed) return;
+        refreshingActivity = true;
+        try
+        {
+            var snapshot = await readActivity();
+            if (IsDisposed) return;
+            // Activity is informational. A slow/stale result must never change selections or start state.
+            UpdateActivities(outputApps, snapshot.Outputs, "Ses üreten uygulama oturumu bekleniyor…");
+            UpdateActivities(micApps, snapshot.Microphones, "Başka uygulamanın mikrofon oturumu yok.");
+            if (snapshot.Warnings.Length > 0) hints.SetToolTip(outputApps, string.Join("\n", snapshot.Warnings));
+        }
+        catch (Exception ex)
+        {
+            if (!IsDisposed) UpdateActivities(outputApps, ["Uygulama bilgisi okunamadı; kayıt etkilenmez. " + ex.Message], "");
+        }
+        finally { refreshingActivity = false; }
     }
 
     private DeviceChoice[] SelectedSources() => outputs.CheckedItems.Cast<DeviceChoice>()
@@ -157,6 +205,7 @@ public sealed partial class MainForm : Form
         if (!devicesLoaded) previous.UnionWith(settings.Devices);
         var choices = observed.Select(d => new DeviceChoice(d.Id,
             d.Name + (d.CommunicationDefault ? "  (iletişim varsayılanı)" : ""), d.Microphone)).ToArray();
+        if (!devicesLoaded && settings.Devices.Length == 0) previous.UnionWith(choices.Select(c => c.Id));
         if (emptySources.TryGetValue(list, out var empty)) { empty.Visible = choices.Length == 0; list.Visible = choices.Length > 0; }
         var old = list.Items.Cast<DeviceChoice>().ToArray();
         if (!old.SequenceEqual(choices))
@@ -192,7 +241,7 @@ public sealed partial class MainForm : Form
     }
     private int Bitrate() => new[] { 128000, 160000, 192000 }[Math.Clamp(quality.SelectedIndex, 0, 2)];
     private static double FileSize(string path) { try { return new FileInfo(path).Length / 1_000_000d; } catch { return 0; } }
-    private static int Level(RecordingSession current, bool mic) => (int)(Math.Clamp(current.Inputs.Where(i => i.Microphone == mic).Select(i => Volatile.Read(ref i.Peak)).DefaultIfEmpty().Max(), 0, 1) * 100);
+    private static int Level(IRecordingSession current, bool mic) => (int)(Math.Clamp(current.Inputs.Where(i => i.Microphone == mic).Select(i => Volatile.Read(ref i.Peak)).DefaultIfEmpty().Max(), 0, 1) * 100);
     private void ShowError(Exception ex) => MessageBox.Show(this, ex.Message, "Ses Kayıt", MessageBoxButtons.OK, MessageBoxIcon.Warning);
     private void LoadSettings()
     {

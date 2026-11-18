@@ -4,8 +4,7 @@ public sealed record ObservedDevice(string Id, string Name, bool Microphone, boo
 
 public static class AutomaticSources
 {
-    // Activity peaks deliberately don't gate capture: quiet audio and the first word matter.
+    // Device availability alone selects sources. Application/session scans never gate recording.
     public static HashSet<string> Select(IEnumerable<ObservedDevice> devices) => devices
-        .Where(d => !d.Microphone || d.CommunicationDefault || d.UsedByOtherApp)
         .Select(d => d.Id).ToHashSet();
 }

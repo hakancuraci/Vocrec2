@@ -10,7 +10,7 @@ public sealed record DeviceChoice(string Id, string Name, bool Microphone)
     public override string ToString() => Name;
 }
 
-public sealed class RecordingSession : IDisposable
+public sealed class RecordingSession : IRecordingSession
 {
     private readonly Dictionary<string, SourceCapture> sources = [];
     private readonly MMDeviceEnumerator enumerator = new();
