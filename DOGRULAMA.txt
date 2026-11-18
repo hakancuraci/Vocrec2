@@ -13,5 +13,6 @@ Vocrec2 doğrulama
   bunları Windows runner üzerinde çalıştıracak şekilde yapılandırıldı.
 - Manas model ağırlıkları yok; gerçek STT ve fiziksel mikrofon dinleme
   testi yapılmadı. Qwen servisi sağlanmadığından REST testleri sahtedir.
-- GitHub yazma denemesi 403 ile reddedildi; uzak Vocrec2 deposuna
-  aktarımın tamamlandığı iddia edilmez.
+- GitHub erişimi güncellendikten sonra kaynak kod
+  https://github.com/hakancuraci/Vocrec2 main dalına gönderildi.
+  Windows testlerinin güncel sonucu GitHub Actions üzerinden izlenebilir.
