@@ -165,16 +165,7 @@ public sealed partial class MainForm
         foreach (int h in new[] { 28, 36, 26, 24 }) grid.RowStyles.Add(new RowStyle(SizeType.Absolute, h));
         grid.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         grid.Controls.Add(Heading("Ses kalitesi"), 0, 0);
-        quality.BackColor = StudioTheme.Field; quality.ForeColor = StudioTheme.Ink; quality.FlatStyle = FlatStyle.Flat;
-        quality.DrawMode = DrawMode.OwnerDrawFixed; quality.ItemHeight = 24; quality.Font = new Font("Segoe UI", 10);
-        quality.AccessibleName = "Kayıt ses kalitesi";
-        quality.DrawItem += (_, e) =>
-        {
-            if (e.Index < 0) return;
-            using var b = new SolidBrush((e.State & DrawItemState.Selected) != 0 ? StudioTheme.Border : StudioTheme.Field);
-            e.Graphics.FillRectangle(b, e.Bounds);
-            TextRenderer.DrawText(e.Graphics, quality.Items[e.Index]?.ToString() ?? "", quality.Font, new Rectangle(e.Bounds.X + 8, e.Bounds.Y, e.Bounds.Width - 8, e.Bounds.Height), StudioTheme.Ink, TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
-        };
+        quality.Font = new Font("Segoe UI", 10); quality.AccessibleName = "Kayıt ses kalitesi";
         grid.Controls.Add(quality, 0, 1);
         size.Font = new Font("Segoe UI", 9); size.ForeColor = StudioTheme.Purple; grid.Controls.Add(size, 0, 2);
         grid.Controls.Add(LabelText("AAC / .m4a     ·     48 kHz stereo", 9), 0, 3);
@@ -211,7 +202,12 @@ public sealed partial class MainForm
         grid.Controls.Add(levels, 0, 4); card.Controls.Add(grid); return card;
     }
 
-    private static TableLayoutPanel Grid(int columns, int rows) => new() { Dock = DockStyle.Fill, ColumnCount = columns, RowCount = rows, Margin = Padding.Empty, Padding = Padding.Empty, BackColor = Color.Transparent };
+    private static TableLayoutPanel Grid(int columns, int rows)
+    {
+        var grid = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = columns, RowCount = rows, Margin = Padding.Empty, Padding = Padding.Empty, BackColor = Color.Transparent };
+        if (rows == 1) grid.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        return grid;
+    }
     private static Label Heading(string text, int size = 12)
     {
         var label = LabelText(text, size); label.ForeColor = StudioTheme.Ink; label.Font = new Font("Segoe UI", size, FontStyle.Bold); return label;

@@ -20,7 +20,7 @@ public sealed partial class MainForm : Form
     private readonly Func<RecordingRequest, IRecordingSession> createRecording;
     private readonly DevicePicker outputs = new(), microphones = new();
     private readonly TextBox folder = new() { Dock = DockStyle.Fill, ReadOnly = true, BorderStyle = BorderStyle.None, BackColor = StudioTheme.Field, ForeColor = StudioTheme.Ink };
-    private readonly ComboBox quality = new() { DropDownStyle = ComboBoxStyle.DropDownList, Dock = DockStyle.Fill };
+    private readonly StudioChoice quality = new() { Dock = DockStyle.Fill };
     private readonly VolumeSlider systemGain = new(), micGain = new();
     private readonly LevelMeter systemMeter = new(), micMeter = new();
     private readonly StudioButton start = MakeButton("●  Kaydı başlat"), stop = MakeButton("■  Kaydı bitir");

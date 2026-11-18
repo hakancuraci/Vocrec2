@@ -148,6 +148,31 @@ public class RecordingStartTests
         return Task.CompletedTask;
     });
 
+    [Fact]
+    public Task StyledQualitySelectionControlsRecordingAndPersists() => OnUiThread(async () =>
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "vocrec-quality-" + Guid.NewGuid().ToString("N"));
+        string settingsFile = Path.Combine(directory, "settings.json");
+        var requests = new List<RecordingRequest>();
+        try
+        {
+            using (var form = new MainForm(() => Task.FromResult(Devices), () => Task.FromResult(EmptyActivity),
+                request => { requests.Add(request); return new FakeSession(request); }, settingsFile))
+            {
+                form.ShowInTaskbar = false; form.Show(); await form.RefreshChannelsAsync();
+                var selector = Descendants(form).Single(c => c.AccessibleName == "Kayıt ses kalitesi");
+                selector.AccessibilityObject.Value = "128 kb/sn · Konuşma";
+                await form.StartAsync();
+                Assert.Equal(128000, Assert.Single(requests).Bitrate);
+                await form.StopAsync(); form.Close();
+            }
+            using var restored = new MainForm(() => Task.FromResult(Devices), () => Task.FromResult(EmptyActivity),
+                request => new FakeSession(request), settingsFile);
+            Assert.Equal("128 kb/sn · Konuşma", Descendants(restored).Single(c => c.AccessibleName == "Kayıt ses kalitesi").AccessibilityObject.Value);
+        }
+        finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
+    });
+
     private static IEnumerable<Control> Descendants(Control parent)
     {
         foreach (Control child in parent.Controls)

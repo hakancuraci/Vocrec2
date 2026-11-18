@@ -86,7 +86,8 @@ public sealed partial class MainForm
             using var dialog = new FolderBrowserDialog { InitialDirectory = input.Text };
             if (dialog.ShowDialog(this) == DialogResult.OK) input.Text = dialog.SelectedPath;
         };
-        hints.SetToolTip(input, name); row.Controls.Add(field, 0, 0); row.Controls.Add(pick, 1, 0);
+        hints.SetToolTip(input, name);
+        input.TextChanged += (_, _) => hints.SetToolTip(input, input.Text); row.Controls.Add(field, 0, 0); row.Controls.Add(pick, 1, 0);
         configuration.Add(input); configuration.Add(pick); return row;
     }
 

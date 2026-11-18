@@ -70,6 +70,7 @@ internal static class Program
     private static void CheckProcessingControls(Form form)
     {
         var controls = Descendants(form).ToArray();
+        foreach (var control in controls.Where(c => c.Visible && c is Button)) CheckAncestorClipping(control);
         if (controls.OfType<TabControl>().Any()) throw new InvalidOperationException("Native white tabs must not return.");
         foreach (string name in new[] { "STT metin çıktı klasörü", "LLM özet çıktı klasörü", "Servis URL", "Model", "Bearer token · isteğe bağlı", "Özet prompt", "Mikrofon konuşma iyileştirme" })
         {
@@ -82,6 +83,16 @@ internal static class Program
         if (!save.Visible || !form.ClientRectangle.Contains(form.RectangleToClient(save.RectangleToScreen(save.ClientRectangle))))
             throw new InvalidOperationException("Save action must remain visible without scrolling.");
         Console.WriteLine($"Modern settings layout verified at {form.Size}.");
+    }
+
+    private static void CheckAncestorClipping(Control control)
+    {
+        var bounds = control.RectangleToScreen(control.ClientRectangle);
+        for (var parent = control.Parent; parent != null; parent = parent.Parent)
+        {
+            if (!parent.RectangleToScreen(parent.ClientRectangle).Contains(bounds))
+                throw new InvalidOperationException($"Control is clipped by parent: {control.Text}; bounds: {bounds}; parent: {parent.GetType().Name} {parent.RectangleToScreen(parent.ClientRectangle)}");
+        }
     }
 
     private static void CheckImportantControls(Form form)

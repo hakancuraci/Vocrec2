@@ -1,6 +1,6 @@
 # Vocrec2
 
-Vocrec'in Windows ses kaydına, **trslocalwin ile aynı yerel Balbal/Manas STT motoru** ve isteğe bağlı **Qwen REST özeti** eklenmiştir. Kayıt arayüzü korunur; sağdaki **STT / LLM ayarları** sekmesi yapılandırma içindir.
+Vocrec'in Windows ses kaydına, **trslocalwin ile aynı yerel Balbal/Manas STT motoru** ve isteğe bağlı **Qwen REST özeti** eklenmiştir. Kayıt arayüzü korunur; üstteki **STT / LLM ayarları** sekmesi yapılandırma içindir.
 
 ## Kullanım
 
