@@ -13,6 +13,30 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  minimum-sdk:
+    name: Build with .NET SDK 8.0.100
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install isolated .NET 8.0.100 SDK
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installer = Join-Path $env:RUNNER_TEMP 'dotnet-install.ps1'
+          Invoke-WebRequest https://dot.net/v1/dotnet-install.ps1 -OutFile $installer
+          & $installer -Version 8.0.100 -InstallDir "$env:RUNNER_TEMP/dotnet8-minimum" -NoPath
+          if (!(Test-Path "$env:RUNNER_TEMP/dotnet8-minimum/dotnet.exe")) { throw 'SDK installation failed' }
+      - name: Verify minimum SDK and build solution
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $dotnet = "$env:RUNNER_TEMP/dotnet8-minimum/dotnet.exe"
+          $version = & $dotnet --version
+          if ($version -ne '8.0.100') { throw "Expected .NET SDK 8.0.100, got $version" }
+          & $dotnet build Vocrec.sln -c Release -warnaserror
+          if ($LASTEXITCODE -ne 0) { throw 'Minimum .NET 8 SDK build failed' }
+
   windows:
     name: Test and package Windows x64
     runs-on: windows-2022

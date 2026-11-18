@@ -13,8 +13,9 @@ Vocrec2 doğrulama
 - Önceki sürümde Windows runner üzerinde 12 Windows AAC/kayıt testi geçti.
   Bearer token sürümünde bunlara 3 DPAPI/kalıcılık testi eklendi;
   güncel Windows test sonucu GitHub Actions üzerinden doğrulanır.
-- Paketleme için .NET SDK 8.0.4xx sürümü global.json ile sabitlendi;
-  runner üzerindeki daha yeni SDK sürümleri bu projeyi değiştirmez.
+- global.json .NET 8.0.100 ve üzeri 8.0.x SDK sürümlerini kabul eder;
+  9/10/11 SDK sürümlerine geçmez. En eski desteklenen SDK için
+  ayrı derleme kontrolü GitHub Actions akışına eklenmiştir.
 - Manas model ağırlıkları yok; gerçek STT ve fiziksel mikrofon dinleme
   testi yapılmadı. Qwen servisi sağlanmadığından REST testleri sahtedir.
 - GitHub erişimi güncellendikten sonra kaynak kod

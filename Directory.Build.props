@@ -1,0 +1,6 @@
+<Project>
+  <PropertyGroup>
+    <!-- Use the C# version shipped with .NET 8 SDK for every project. -->
+    <LangVersion>12.0</LangVersion>
+  </PropertyGroup>
+</Project>

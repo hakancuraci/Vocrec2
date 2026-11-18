@@ -34,7 +34,20 @@ Bu, yankı giderme veya kaynak ayırma modeli değildir. Konuşma sırasında y�
 
 ## Derleme ve test
 
-.NET 8 SDK, Windows x64:
+Windows x64 üzerinde **.NET 8 SDK** (8.0.100 veya daha yeni bir 8.0.x sürümü) yeterlidir. .NET 11 gerekmez. Visual Studio kullanıyorsanız Visual Studio 2022 17.8 veya üzeri ve “.NET masaüstü geliştirme” iş yükü gerekir. Yalnız Runtime kurulumu kaynak kodu derlemek için yeterli değildir.
+
+Depo kökündeki `global.json`, kurulu en yeni **8.0.x** SDK'yı seçer; 9/10/11'e geçmez. Önceki 8.0.4xx kısıtı kaldırılmıştır. Visual Studio'nun da bilgisayarınızdaki SDK sürümünü desteklemesi gerekir (örneğin 8.0.4xx için VS 17.11+); komut satırından derleme için Visual Studio gerekmez.
+
+Komutları `Vocrec.sln` ve `global.json` dosyalarının bulunduğu depo kökünde çalıştırın:
+
+```powershell
+dotnet --list-sdks
+dotnet --version
+```
+
+`dotnet --version` çıktısı `8.0.x` olmalıdır. Projeler `net8.0` / `net8.0-windows` hedefler ve C# 12 kullanır. `NETSDK1141` hatası, `global.json` ile eşleşen SDK bulunamadığını belirtir; güncel dosyayı kullanın ve listede .NET 8 SDK bulunduğundan emin olun.
+
+Derleme ve test:
 
 ```powershell
 dotnet build Vocrec.sln -c Release -warnaserror
