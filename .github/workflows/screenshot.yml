@@ -3,6 +3,7 @@ name: Windows app screenshot
 on:
   push:
     paths:
+      - "App/**"
       - "Screenshot/**"
       - ".github/workflows/screenshot.yml"
   workflow_dispatch:
