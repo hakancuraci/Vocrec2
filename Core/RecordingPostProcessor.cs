@@ -9,6 +9,8 @@ public sealed class RecordingPostProcessor(HttpClient http, Func<string, Cancell
     Func<PostProcessingSettings, string>? resolveBearerToken = null)
 {
     private readonly SemaphoreSlim gate = new(1, 1);
+    private const string TitlePrompt = "Aşağıdaki özeti temsil eden en fazla 5 kelimelik Türkçe bir dosya adı üret. Yalnızca dosya adını yaz. Açıklama, uzantı, tırnak veya Markdown ekleme.";
+    private sealed record SummaryState(string Summary, string? Title = null, string? OutputPath = null);
 
     public async Task ProcessAsync(string audio, PostProcessingSettings settings, Action<string> progress, CancellationToken token = default)
     {
@@ -19,38 +21,79 @@ public sealed class RecordingPostProcessor(HttpClient http, Func<string, Cancell
             Directory.CreateDirectory(settings.TranscriptFolder);
             string name = Path.GetFileNameWithoutExtension(audio);
             string transcript = Path.Combine(settings.TranscriptFolder, name + ".txt");
-            // Reprocessing an already transcribed recording can retry an unavailable LLM.
             string text = File.Exists(transcript) ? await File.ReadAllTextAsync(transcript, token) : await transcribe(audio, token);
             await WriteAtomicAsync(transcript, text, token);
             progress("Metin kaydedildi: " + transcript);
-            var endpoint = settings.Endpoint();
-            if (endpoint == null || string.IsNullOrWhiteSpace(text)) return;
-            progress("LLM özeti hazırlanıyor · " + name);
-            using var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
-            string bearerToken = LlmAuthentication.NormalizeBearerToken(resolveBearerToken?.Invoke(settings));
-            if (bearerToken.Length > 0) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
-            request.Content = JsonContent.Create(new
-            {
-                model = settings.LlmModel.Trim(), stream = false,
-                chat_template_kwargs = new { enable_thinking = true },
-                messages = new[]
-                {
-                    new { role = "system", content = "Answer the question asked." },
-                    new { role = "user", content = settings.LlmPrompt },
-                    new { role = "user", content = text }
-                }
-            });
-            using var response = await http.SendAsync(request, token);
-            if (!response.IsSuccessStatusCode) throw new HttpRequestException($"LLM HTTP {(int)response.StatusCode}. Metin korundu: {transcript}");
-            using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(token));
-            string? summary = json.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString();
-            if (string.IsNullOrWhiteSpace(summary)) throw new IOException("LLM boş özet döndürdü. Metin dosyası korundu.");
+            if (settings.Endpoint() == null || string.IsNullOrWhiteSpace(text)) return;
             Directory.CreateDirectory(settings.SummaryFolder);
-            string output = Path.Combine(settings.SummaryFolder, name + ".ozet.txt");
-            await WriteAtomicAsync(output, summary, token);
+            string stateFolder = Path.Combine(settings.TranscriptFolder, ".vocrec2");
+            Directory.CreateDirectory(stateFolder);
+            string statePath = Path.Combine(stateFolder, name + ".summary.json");
+            string fallback = Path.Combine(settings.SummaryFolder, name + ".ozet.txt");
+            SummaryState? state = null;
+            if (File.Exists(statePath))
+            {
+                try { state = JsonSerializer.Deserialize<SummaryState>(await File.ReadAllTextAsync(statePath, token)); }
+                catch (JsonException) { /* The saved draft below also allows recovery. */ }
+            }
+            if (state?.OutputPath != null && File.Exists(state.OutputPath))
+            {
+                progress("Özet kaydedildi: " + state.OutputPath); return;
+            }
+            if (state == null)
+            {
+                progress("LLM özeti hazırlanıyor · " + name);
+                string summary = File.Exists(fallback) ? await File.ReadAllTextAsync(fallback, token) : await CallLlmAsync(settings, settings.LlmPrompt, text, token);
+                state = new SummaryState(summary);
+                await WriteAtomicAsync(statePath, JsonSerializer.Serialize(state), token);
+            }
+            // Preserve the summary before asking the model for its filename.
+            await WriteAtomicAsync(fallback, state.Summary, token);
+            if (state.Title == null)
+            {
+                progress("Özet için kısa dosya adı oluşturuluyor…");
+                try
+                {
+                    string title = await CallLlmAsync(settings, TitlePrompt, state.Summary, token);
+                    state = state with { Title = SummaryFileNames.Normalize(title) };
+                    await WriteAtomicAsync(statePath, JsonSerializer.Serialize(state), token);
+                }
+                catch (Exception ex) when (ex is HttpRequestException or IOException or JsonException or InvalidOperationException)
+                {
+                    throw new IOException("Özet korundu; dosya adı alınamadı. Bekleyen işlemi yeniden deneyin. Özet: " + fallback, ex);
+                }
+            }
+            string output = await SummaryFileNames.WriteUniqueAsync(settings.SummaryFolder, state.Title, state.Summary, token);
+            state = state with { OutputPath = output };
+            await WriteAtomicAsync(statePath, JsonSerializer.Serialize(state), token);
+            if (!string.Equals(fallback, output, StringComparison.OrdinalIgnoreCase)) File.Delete(fallback);
             progress("Özet kaydedildi: " + output);
         }
         finally { gate.Release(); }
+    }
+
+    private async Task<string> CallLlmAsync(PostProcessingSettings settings, string prompt, string text, CancellationToken token)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, settings.Endpoint());
+        string bearerToken = LlmAuthentication.NormalizeBearerToken(resolveBearerToken?.Invoke(settings));
+        if (bearerToken.Length > 0) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
+        request.Content = JsonContent.Create(new
+        {
+            model = settings.LlmModel.Trim(), stream = false,
+            chat_template_kwargs = new { enable_thinking = true },
+            messages = new[]
+            {
+                new { role = "system", content = "Answer the question asked." },
+                new { role = "user", content = prompt },
+                new { role = "user", content = text }
+            }
+        });
+        using var response = await http.SendAsync(request, token);
+        if (!response.IsSuccessStatusCode) throw new HttpRequestException($"LLM HTTP {(int)response.StatusCode}. Kaydedilmiş metin ve özetler korundu.");
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(token));
+        string? content = json.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString();
+        if (string.IsNullOrWhiteSpace(content)) throw new IOException("LLM boş yanıt döndürdü. Kaydedilmiş dosyalar korundu.");
+        return content;
     }
 
     private static async Task WriteAtomicAsync(string path, string text, CancellationToken token)

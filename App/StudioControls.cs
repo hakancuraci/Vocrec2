@@ -204,15 +204,11 @@ internal sealed class StudioSwitch : CheckBox
 
 internal sealed class BrandMark : Control
 {
-    public BrandMark() { DoubleBuffered = true; Size = new Size(42, 42); BackColor = StudioTheme.Background; }
+    public BrandMark() { DoubleBuffered = true; Size = new Size(42, 42); BackColor = StudioTheme.Background; AccessibleName = "Vocrec2 logosu"; }
     protected override void OnPaint(PaintEventArgs e)
     {
-        var g = e.Graphics; g.Clear(StudioTheme.Surface(Parent)); g.SmoothingMode = SmoothingMode.AntiAlias;
-        using var shape = StudioTheme.Round(new RectangleF(1, 1, Width - 2, Height - 2), 11);
-        using var fill = new SolidBrush(StudioTheme.Purple); g.FillPath(fill, shape);
-        using var pen = new Pen(StudioTheme.Background, 3) { StartCap = LineCap.Round, EndCap = LineCap.Round };
-        int[] heights = [8, 19, 27, 16, 8];
-        for (int i = 0; i < 5; i++) { float x = Width / 2f + (i - 2) * 5; g.DrawLine(pen, x, (Height - heights[i]) / 2f, x, (Height + heights[i]) / 2f); }
+        e.Graphics.Clear(StudioTheme.Surface(Parent));
+        e.Graphics.DrawIcon(AppLogo.Icon, new Rectangle(0, 0, Width, Height));
     }
 }
 

@@ -72,7 +72,7 @@ internal static class Program
         var controls = Descendants(form).ToArray();
         foreach (var control in controls.Where(c => c.Visible && c is Button)) CheckAncestorClipping(control);
         if (controls.OfType<TabControl>().Any()) throw new InvalidOperationException("Native white tabs must not return.");
-        foreach (string name in new[] { "STT metin çıktı klasörü", "LLM özet çıktı klasörü", "Servis URL", "Model", "Bearer token · isteğe bağlı", "Özet prompt", "Mikrofon konuşma iyileştirme" })
+        foreach (string name in new[] { "Kayıtlı LLM profili", "Profil adı", "STT metin çıktı klasörü", "LLM özet çıktı klasörü", "Servis URL", "Model", "Bearer token · isteğe bağlı", "Özet prompt", "Mikrofon konuşma iyileştirme" })
         {
             var control = controls.Single(c => c.AccessibleName == name);
             var bounds = form.RectangleToClient(control.RectangleToScreen(control.ClientRectangle));
@@ -97,6 +97,7 @@ internal static class Program
 
     private static void CheckImportantControls(Form form)
     {
+        if (form.Icon == null || form.Icon.Width < 16) throw new InvalidOperationException("Product icon must be embedded in the form.");
         Control[] controls = Descendants(form).ToArray();
         foreach (string text in new[] { "Kayıt klasörünü değiştir", "Klasörü görüntüle", "●  Kaydı başlat", "■  Kaydı bitir" })
         {

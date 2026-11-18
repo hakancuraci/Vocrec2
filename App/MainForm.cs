@@ -50,6 +50,8 @@ public sealed partial class MainForm : Form
         this.createRecording = createRecording;
         if (settingsFile != null) settingsPath = settingsFile;
         Text = "Vocrec2 · Ses kayıt stüdyosu";
+        var windowIcon = (Icon)AppLogo.Icon.Clone(); Icon = windowIcon;
+        Disposed += (_, _) => windowIcon.Dispose();
         BackColor = Bg; ForeColor = StudioTheme.Ink; Font = new Font("Segoe UI", 10);
         FormBorderStyle = FormBorderStyle.None;
         MinimumSize = new Size(960, 720); Size = new Size(1020, 760); StartPosition = FormStartPosition.CenterScreen;
@@ -261,7 +263,7 @@ public sealed partial class MainForm : Form
     {
         try { if (File.Exists(settingsPath)) settings = JsonSerializer.Deserialize<Settings>(File.ReadAllText(settingsPath)) ?? new(); } catch { settings = new(); }
         settings.Processing ??= new();
-        LoadProcessingControls(settings.Processing);
+        InitializeLlmProfiles();
         folder.Text = settings.Folder; hints.SetToolTip(folder, folder.Text); automatic.Checked = settings.Automatic;
         // Preserve the previous 192 kb/s default when loading older index-based settings.
         int preferredBitrate = settings.Bitrate ?? (settings.Quality == 0 ? 128000 : 192000);
@@ -272,12 +274,15 @@ public sealed partial class MainForm : Form
     {
         try
         {
-            settings = new Settings { Folder = folder.Text, Automatic = automatic.Checked, Bitrate = Bitrate(), SystemGain = systemGain.Value, MicGain = micGain.Value,
-                Processing = settings.Processing,
-                Devices = outputs.CheckedItems.Cast<DeviceChoice>().Concat(microphones.CheckedItems.Cast<DeviceChoice>()).Select(d => d.Id).ToArray() };
+            CaptureOutputPreferences();
+            try { SaveCurrentProfileDraft(); }
+            catch (ArgumentException ex) { status.Text = "LLM token kaydedilemedi: " + ex.Message; }
+            settings.Folder = folder.Text; settings.Automatic = automatic.Checked; settings.Bitrate = Bitrate();
+            settings.SystemGain = systemGain.Value; settings.MicGain = micGain.Value;
+            settings.Devices = outputs.CheckedItems.Cast<DeviceChoice>().Concat(microphones.CheckedItems.Cast<DeviceChoice>()).Select(d => d.Id).ToArray();
             PersistSettings();
         }
-        catch { /* Saving preferences must not interrupt a recording. */ }
+        catch (Exception ex) { status.Text = "Ayarlar kaydedilemedi: " + ex.Message; }
     }
     protected override void Dispose(bool disposing) { if (disposing) { timer.Dispose(); discoveryTimer.Dispose(); hints.Dispose(); session?.Dispose(); } base.Dispose(disposing); }
     private static Label LabelText(string value, int fontSize = 10) => new() { Text = value, Dock = DockStyle.Fill, AutoSize = false, TextAlign = ContentAlignment.MiddleLeft, ForeColor = StudioTheme.Muted, Font = new Font("Segoe UI", fontSize), AutoEllipsis = true, Margin = Padding.Empty };
@@ -287,6 +292,8 @@ public sealed partial class MainForm : Form
     {
         public Settings() { }
         public PostProcessingSettings Processing { get; set; } = new();
+        public List<LlmProfile> LlmProfiles { get; set; } = [];
+        public string SelectedLlmProfileId { get; set; } = "";
         public bool Automatic { get; set; } = true;
         public string Folder { get; set; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyMusic), "SesKayit");
         public int Quality { get; set; } = 1;

@@ -6,6 +6,9 @@ namespace SesKayit;
 public sealed partial class MainForm
 {
     private readonly TextBox transcriptFolder = new(), summaryFolder = new(), llmUrl = new(), llmModel = new(), llmPrompt = new(), llmBearerToken = new() { UseSystemPasswordChar = true };
+    private readonly StudioChoice profilePicker = new() { Dock = DockStyle.Fill, AccessibleName = "Kayıtlı LLM profili" };
+    private readonly TextBox profileName = new();
+    private bool loadingProfiles, processingControlsReady;
     private readonly StudioSwitch enhanceMic = new() { Text = "Mikrofon konuşma iyileştirme", AccessibleName = "Mikrofon konuşma iyileştirme", OffText = "Kapalı" };
     private readonly Label processingSaveState = LabelText("URL boşsa yalnızca metin oluşturulur.", 8);
     private readonly StudioButton saveProcessing = MakeButton("Ayarları kaydet");
@@ -47,8 +50,8 @@ public sealed partial class MainForm
         configuration.Add(enhanceMic); columns.Controls.Add(left, 0, 0);
 
         var llmCard = new StudioCard { Dock = DockStyle.Fill, Padding = new Padding(18, 14, 18, 14), Margin = Padding.Empty };
-        var llmGrid = Grid(1, 7);
-        foreach (int height in new[] { 26, 24, 64, 64 }) llmGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, height));
+        var llmGrid = Grid(1, 8);
+        foreach (int height in new[] { 26, 24, 64, 64, 64 }) llmGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, height));
         llmGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         llmGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, 24)); llmGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
         var title = Grid(2, 1); title.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); title.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 112));
@@ -56,21 +59,32 @@ public sealed partial class MainForm
         var badge = LabelText("İSTEĞE BAĞLI", 8); badge.ForeColor = StudioTheme.Purple; badge.TextAlign = ContentAlignment.MiddleRight; title.Controls.Add(badge, 1, 0);
         llmGrid.Controls.Add(title, 0, 0);
         llmGrid.Controls.Add(LabelText("Bağlantınızı kurun, özetin içeriğini prompt ile belirleyin.", 9), 0, 1);
+        var profiles = Grid(1, 2); profiles.RowStyles.Add(new RowStyle(SizeType.Absolute, 22)); profiles.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); profiles.Margin = new Padding(0, 0, 0, 6);
+        profiles.Controls.Add(LabelText("Kayıtlı LLM profili", 9), 0, 0);
+        var profileActions = Grid(3, 1); profileActions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); profileActions.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 68)); profileActions.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 56));
+        profilePicker.Margin = new Padding(0, 0, 8, 0); profileActions.Controls.Add(profilePicker, 0, 0);
+        var addProfile = MakeButton("Yeni"); addProfile.Name = "AddLlmProfile"; addProfile.Accent = true; addProfile.Margin = new Padding(0, 0, 6, 0);
+        var deleteProfile = MakeButton("Sil"); deleteProfile.Name = "DeleteLlmProfile"; deleteProfile.Margin = Padding.Empty;
+        addProfile.Click += (_, _) => AddLlmProfile(); deleteProfile.Click += (_, _) => DeleteLlmProfile();
+        profileActions.Controls.Add(addProfile, 1, 0); profileActions.Controls.Add(deleteProfile, 2, 0); profiles.Controls.Add(profileActions, 0, 1);
+        llmGrid.Controls.Add(profiles, 0, 2); configuration.Add(profilePicker); configuration.Add(addProfile); configuration.Add(deleteProfile);
         var connection = Grid(2, 1); connection.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 62)); connection.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 38));
         var urlField = InputField("Servis URL", llmUrl, "http://localhost:8000/v1"); urlField.Margin = new Padding(0, 0, 12, 6);
         connection.Controls.Add(urlField, 0, 0); connection.Controls.Add(InputField("Model", llmModel, "Örn. Qwen3-8B"), 1, 0);
-        llmGrid.Controls.Add(connection, 0, 2);
+        llmGrid.Controls.Add(connection, 0, 3);
         var tokenGrid = InputField("Bearer token · isteğe bağlı", llmBearerToken, "Tokenınızı girin", secret: true);
-        llmGrid.Controls.Add(tokenGrid, 0, 3);
+        var identity = Grid(2, 1); identity.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 36)); identity.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 64));
+        var nameField = InputField("Profil adı", profileName, "Örn. Yerel Qwen"); nameField.Margin = new Padding(0, 0, 12, 6);
+        identity.Controls.Add(nameField, 0, 0); identity.Controls.Add(tokenGrid, 1, 0); llmGrid.Controls.Add(identity, 0, 4);
         hints.SetToolTip(llmBearerToken, "Windows hesabınıza bağlı şifreli kaydedilir. Boş bırakıp kaydetmek tokenı kaldırır.");
         llmPrompt.Multiline = true; llmPrompt.ScrollBars = ScrollBars.Vertical;
-        llmGrid.Controls.Add(InputField("Özet prompt", llmPrompt, "Özetin dili, ayrıntı seviyesi ve içeriği…"), 0, 4);
-        llmGrid.Controls.Add(processingSaveState, 0, 5);
+        llmGrid.Controls.Add(InputField("Özet prompt", llmPrompt, "Özetin dili, ayrıntı seviyesi ve içeriği…"), 0, 5);
+        llmGrid.Controls.Add(processingSaveState, 0, 6);
         var actions = Grid(2, 1); actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 48)); actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 52));
         var retry = MakeButton("Bekleyenleri yeniden dene"); retry.Font = new Font("Segoe UI", 9); retry.Margin = new Padding(0, 0, 10, 0);
         retry.Click += (_, _) => ResumePending(useCurrentSettings: true);
         saveProcessing.Primary = true; saveProcessing.Margin = Padding.Empty;
-        actions.Controls.Add(retry, 0, 0); actions.Controls.Add(saveProcessing, 1, 0); llmGrid.Controls.Add(actions, 0, 6);
+        actions.Controls.Add(retry, 0, 0); actions.Controls.Add(saveProcessing, 1, 0); llmGrid.Controls.Add(actions, 0, 7);
         configuration.Add(retry); configuration.Add(saveProcessing);
         llmCard.Controls.Add(llmGrid); columns.Controls.Add(llmCard, 1, 0);
         return columns;
@@ -85,8 +99,9 @@ public sealed partial class MainForm
         pick.Click += (_, _) =>
         {
             using var dialog = new FolderBrowserDialog { InitialDirectory = input.Text };
-            if (dialog.ShowDialog(this) == DialogResult.OK) input.Text = dialog.SelectedPath;
+            if (dialog.ShowDialog(this) == DialogResult.OK) { input.Text = dialog.SelectedPath; SaveOutputPreferences(); }
         };
+        input.Leave += (_, _) => SaveOutputPreferences();
         hints.SetToolTip(input, name);
         input.TextChanged += (_, _) => hints.SetToolTip(input, input.Text); row.Controls.Add(field, 0, 0); row.Controls.Add(pick, 1, 0);
         configuration.Add(input); configuration.Add(pick); return row;
@@ -124,29 +139,23 @@ public sealed partial class MainForm
     private void InitializeProcessingControls()
     {
         Shown += (_, _) => ResumePending(useCurrentSettings: false);
+        profilePicker.SelectedIndexChanged += (_, _) => SwitchLlmProfile();
         llmPrompt.HandleCreated += (_, _) => UpdatePromptScrollBars();
         llmPrompt.SizeChanged += (_, _) => UpdatePromptScrollBars();
         llmPrompt.TextChanged += (_, _) => UpdatePromptScrollBars();
-        foreach (var field in new[] { transcriptFolder, summaryFolder, llmUrl, llmModel, llmPrompt, llmBearerToken })
+        foreach (var field in new[] { transcriptFolder, summaryFolder, llmUrl, llmModel, llmPrompt, llmBearerToken, profileName })
             field.TextChanged += (_, _) => { processingSaveState.Text = "Değişiklikleri uygulamak için kaydedin."; processingSaveState.ForeColor = StudioTheme.Muted; };
-        enhanceMic.CheckedChanged += (_, _) => processingSaveState.Text = "Değişiklikleri uygulamak için kaydedin.";
+        enhanceMic.CheckedChanged += (_, _) => SaveOutputPreferences();
         saveProcessing.Click += (_, _) =>
         {
             try
             {
-                var value = new PostProcessingSettings
-                {
-                    TranscriptFolder = transcriptFolder.Text.Trim(), SummaryFolder = summaryFolder.Text.Trim(),
-                    ProtectedLlmBearerToken = LlmTokenProtection.Protect(llmBearerToken.Text),
-                    LlmUrl = llmUrl.Text.Trim(), LlmModel = llmModel.Text.Trim(), LlmPrompt = llmPrompt.Text,
-                    EnhanceMicrophone = enhanceMic.Checked
-                };
+                var value = ReadProcessingControls();
                 value.Validate();
                 Directory.CreateDirectory(value.TranscriptFolder); Directory.CreateDirectory(value.SummaryFolder);
-                var previous = settings.Processing;
-                settings.Processing = value;
-                try { PersistSettings(); }
-                catch { settings.Processing = previous; throw; }
+                SaveCurrentProfileDraft();
+                PersistSettings();
+                RefreshProfilePicker();
                 status.Text = "STT / LLM ayarları kaydedildi.";
                 processingSaveState.Text = "✓ Ayarlar kaydedildi"; processingSaveState.ForeColor = StudioTheme.Mint;
             }
@@ -154,14 +163,132 @@ public sealed partial class MainForm
         };
     }
 
+    private PostProcessingSettings ReadProcessingControls() => new()
+    {
+        TranscriptFolder = transcriptFolder.Text.Trim(), SummaryFolder = summaryFolder.Text.Trim(),
+        ProtectedLlmBearerToken = LlmTokenProtection.Protect(llmBearerToken.Text),
+        LlmUrl = llmUrl.Text.Trim(), LlmModel = llmModel.Text.Trim(), LlmPrompt = llmPrompt.Text,
+        EnhanceMicrophone = enhanceMic.Checked
+    };
+
+    private void CaptureOutputPreferences()
+    {
+        settings.Processing = settings.Processing with
+        {
+            TranscriptFolder = transcriptFolder.Text.Trim(), SummaryFolder = summaryFolder.Text.Trim(),
+            EnhanceMicrophone = enhanceMic.Checked
+        };
+    }
+
+    private void SaveOutputPreferences()
+    {
+        if (!processingControlsReady || loadingProfiles) return;
+        try { CaptureOutputPreferences(); PersistSettings(); processingSaveState.Text = "Çıktı klasörleri otomatik kaydedildi."; }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { status.Text = "Ayarlar kaydedilemedi: " + ex.Message; }
+    }
+
     private void LoadProcessingControls(PostProcessingSettings value)
     {
-        transcriptFolder.Text = value.TranscriptFolder; summaryFolder.Text = value.SummaryFolder;
-        llmUrl.Text = value.LlmUrl; llmModel.Text = value.LlmModel; llmPrompt.Text = value.LlmPrompt;
-        enhanceMic.Checked = value.EnhanceMicrophone;
-        try { llmBearerToken.Text = LlmTokenProtection.Unprotect(value.ProtectedLlmBearerToken); }
-        catch (InvalidOperationException ex) { llmBearerToken.Clear(); status.Text = ex.Message; hints.SetToolTip(llmBearerToken, ex.Message); }
-        processingSaveState.Text = "URL boşsa yalnızca metin oluşturulur.";
+        bool previous = loadingProfiles; loadingProfiles = true;
+        try
+        {
+            transcriptFolder.Text = value.TranscriptFolder; summaryFolder.Text = value.SummaryFolder;
+            llmUrl.Text = value.LlmUrl; llmModel.Text = value.LlmModel; llmPrompt.Text = value.LlmPrompt;
+            llmBearerToken.UseSystemPasswordChar = true;
+            var reveal = llmBearerToken.Parent?.Controls.OfType<StudioButton>().FirstOrDefault();
+            if (reveal != null) reveal.Text = "Göster";
+            enhanceMic.Checked = value.EnhanceMicrophone;
+            try { llmBearerToken.Text = LlmTokenProtection.Unprotect(value.ProtectedLlmBearerToken); }
+            catch (InvalidOperationException ex) { llmBearerToken.Clear(); status.Text = ex.Message; hints.SetToolTip(llmBearerToken, ex.Message); }
+            processingSaveState.Text = "Seçili profil kayıtlar için kullanılır.";
+        }
+        finally { loadingProfiles = previous; }
+    }
+
+    private void InitializeLlmProfiles()
+    {
+        settings.LlmProfiles ??= [];
+        if (settings.LlmProfiles.Count == 0) settings.LlmProfiles.Add(LlmProfile.FromSettings(settings.Processing, "Varsayılan"));
+        var selected = settings.LlmProfiles.FirstOrDefault(p => p.Id == settings.SelectedLlmProfileId) ?? settings.LlmProfiles[0];
+        settings.SelectedLlmProfileId = selected.Id;
+        settings.Processing = selected.ApplyTo(settings.Processing);
+        LoadProcessingControls(settings.Processing);
+        profileName.Text = selected.Name;
+        RefreshProfilePicker(); processingControlsReady = true;
+    }
+
+    private void RefreshProfilePicker()
+    {
+        bool previous = loadingProfiles; loadingProfiles = true;
+        try
+        {
+            profilePicker.SelectedIndex = -1; profilePicker.Items.Clear();
+            profilePicker.Items.AddRange(settings.LlmProfiles.Cast<object>());
+            profilePicker.SelectedIndex = settings.LlmProfiles.FindIndex(p => p.Id == settings.SelectedLlmProfileId);
+            profilePicker.Invalidate();
+        }
+        finally { loadingProfiles = previous; }
+    }
+
+    private void SaveCurrentProfileDraft()
+    {
+        if (!processingControlsReady || loadingProfiles) return;
+        CaptureOutputPreferences();
+        var value = ReadProcessingControls();
+        string name = profileName.Text.Trim();
+        if (name.Length == 0) name = string.IsNullOrWhiteSpace(value.LlmModel) ? "LLM " + (settings.LlmProfiles.Count + 1) : value.LlmModel;
+        string baseName = name;
+        for (int suffix = 2; settings.LlmProfiles.Any(p => p.Id != settings.SelectedLlmProfileId && string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase)); suffix++)
+            name = baseName + " (" + suffix + ")";
+        profileName.Text = name;
+        var profile = LlmProfile.FromSettings(value, name, settings.SelectedLlmProfileId);
+        int index = settings.LlmProfiles.FindIndex(p => p.Id == profile.Id);
+        if (index < 0) settings.LlmProfiles.Add(profile); else settings.LlmProfiles[index] = profile;
+        settings.SelectedLlmProfileId = profile.Id; settings.Processing = value;
+    }
+
+    private void SwitchLlmProfile()
+    {
+        if (loadingProfiles || !processingControlsReady || profilePicker.SelectedIndex < 0) return;
+        var next = (LlmProfile)profilePicker.Items[profilePicker.SelectedIndex];
+        try
+        {
+            SaveCurrentProfileDraft();
+            var selected = settings.LlmProfiles.First(p => p.Id == next.Id);
+            settings.SelectedLlmProfileId = selected.Id; settings.Processing = selected.ApplyTo(settings.Processing);
+            LoadProcessingControls(settings.Processing); profileName.Text = selected.Name;
+            PersistSettings(); RefreshProfilePicker();
+        }
+        catch (Exception ex) { RefreshProfilePicker(); ShowError(ex); }
+    }
+
+    private void AddLlmProfile()
+    {
+        try
+        {
+            SaveCurrentProfileDraft();
+            var profile = new LlmProfile { Name = "LLM " + (settings.LlmProfiles.Count + 1) };
+            settings.LlmProfiles.Add(profile); settings.SelectedLlmProfileId = profile.Id;
+            settings.Processing = profile.ApplyTo(settings.Processing);
+            LoadProcessingControls(settings.Processing); profileName.Text = profile.Name;
+            RefreshProfilePicker(); PersistSettings(); profileName.Focus(); profileName.SelectAll();
+        }
+        catch (Exception ex) { ShowError(ex); }
+    }
+
+    private void DeleteLlmProfile()
+    {
+        try
+        {
+            CaptureOutputPreferences();
+            settings.LlmProfiles.RemoveAll(p => p.Id == settings.SelectedLlmProfileId);
+            if (settings.LlmProfiles.Count == 0) settings.LlmProfiles.Add(new LlmProfile());
+            var selected = settings.LlmProfiles[0]; settings.SelectedLlmProfileId = selected.Id;
+            settings.Processing = selected.ApplyTo(settings.Processing);
+            LoadProcessingControls(settings.Processing); profileName.Text = selected.Name;
+            RefreshProfilePicker(); PersistSettings();
+        }
+        catch (Exception ex) { ShowError(ex); }
     }
 
     private void PersistSettings()

@@ -2,7 +2,7 @@ Vocrec2 doğrulama
 
 - .NET SDK 9.0.317 ile çözüm derlendi; .NET 8 kurulumu gerekmez.
 - Windows hedefli çözüm Release derlemesi: 0 hata, 0 uyarı.
-- Platform bağımsız testler (Bearer token dahil): 37/37 geçti.
+- Platform bağımsız testler (Bearer token dahil): 49/49 geçti.
 - Testler: mevcut mixer/kaynak seçimi; mikrofon uğultu, arka plan,
   konuşma kazancı, stereo ve tepe sınırı; STT metninin LLM öncesi
   yazılması; LLM istek/yanıt formatı; HTTP hatasında metnin korunması;
@@ -21,3 +21,7 @@ Vocrec2 doğrulama
 - GitHub erişimi güncellendikten sonra kaynak kod
   https://github.com/hakancuraci/Vocrec2 main dalına gönderildi.
   Windows testlerinin güncel sonucu GitHub Actions üzerinden izlenebilir.
+
+- Klasörlerin kapanışta korunması, çoklu profil seçimi ve token ayrımı için
+  Windows arayüz testleri eklendi. Özet adı çağrısında hata sonrası devam,
+  dosya çakışması ve güvenli 5 kelimelik ad kuralları test edildi.

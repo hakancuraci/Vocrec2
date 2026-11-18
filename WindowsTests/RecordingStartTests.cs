@@ -173,6 +173,97 @@ public class RecordingStartTests
         finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
     });
 
+    [Fact]
+    public Task OutputFoldersSurviveCloseWithIncompleteLlmSettings() => OnUiThread(() =>
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "vocrec-folders-" + Guid.NewGuid().ToString("N"));
+        string file = Path.Combine(directory, "settings.json");
+        try
+        {
+            using (var form = new MainForm(() => Task.FromResult(Devices), () => Task.FromResult(EmptyActivity), request => new FakeSession(request), file))
+            {
+                form.ShowInTaskbar = false; form.Show();
+                Descendants(form).OfType<Button>().Single(c => c.Name == "ProcessingTab").PerformClick();
+                var controls = Descendants(form).ToArray();
+                ((TextBox)controls.Single(c => c.AccessibleName == "STT metin çıktı klasörü")).Text = Path.Combine(directory, "custom-text");
+                ((TextBox)controls.Single(c => c.AccessibleName == "LLM özet çıktı klasörü")).Text = Path.Combine(directory, "custom-summary");
+                ((TextBox)controls.Single(c => c.AccessibleName == "Servis URL")).Text = "incomplete-url";
+                Assert.NotNull(form.Icon);
+                form.Close(); // No explicit save click: this reproduced the reported bug.
+            }
+            using var restored = new MainForm(() => Task.FromResult(Devices), () => Task.FromResult(EmptyActivity), request => new FakeSession(request), file);
+            var restoredControls = Descendants(restored).ToArray();
+            Assert.Equal(Path.Combine(directory, "custom-text"), restoredControls.Single(c => c.AccessibleName == "STT metin çıktı klasörü").Text);
+            Assert.Equal(Path.Combine(directory, "custom-summary"), restoredControls.Single(c => c.AccessibleName == "LLM özet çıktı klasörü").Text);
+        }
+        finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
+        return Task.CompletedTask;
+    });
+
+    [Fact]
+    public Task MultipleLlmProfilesPersistSelectionAndSeparateEncryptedTokens() => OnUiThread(() =>
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "vocrec-profiles-" + Guid.NewGuid().ToString("N"));
+        string file = Path.Combine(directory, "settings.json");
+        try
+        {
+            using (var form = new MainForm(() => Task.FromResult(Devices), () => Task.FromResult(EmptyActivity), request => new FakeSession(request), file))
+            {
+                form.ShowInTaskbar = false; form.Show();
+                Descendants(form).OfType<Button>().Single(c => c.Name == "ProcessingTab").PerformClick();
+                void Set(string label, string value) => ((TextBox)Descendants(form).Single(c => c.AccessibleName == label)).Text = value;
+                Set("STT metin çıktı klasörü", Path.Combine(directory, "text"));
+                Set("LLM özet çıktı klasörü", Path.Combine(directory, "summary"));
+                Set("Profil adı", "Yerel Qwen"); Set("Servis URL", "http://localhost:8000"); Set("Model", "qwen-a");
+                Set("Bearer token · isteğe bağlı", "fake-token-a"); Set("Özet prompt", "Birinci prompt");
+                Descendants(form).OfType<Button>().Single(c => c.Text == "Ayarları kaydet").PerformClick();
+                Descendants(form).OfType<Button>().Single(c => c.Name == "AddLlmProfile").PerformClick();
+                Set("Profil adı", "Uzak GLM"); Set("Servis URL", "https://example.test/v1"); Set("Model", "glm-b");
+                Set("Bearer token · isteğe bağlı", "fake-token-b"); Set("Özet prompt", "İkinci prompt");
+                Descendants(form).OfType<Button>().Single(c => c.Text == "Ayarları kaydet").PerformClick();
+                var picker = Descendants(form).Single(c => c.AccessibleName == "Kayıtlı LLM profili");
+                picker.AccessibilityObject.Value = "Yerel Qwen";
+                Assert.Equal("qwen-a", Descendants(form).Single(c => c.AccessibleName == "Model").Text);
+                Assert.Equal("fake-token-a", Descendants(form).Single(c => c.AccessibleName == "Bearer token · isteğe bağlı").Text);
+                form.Close();
+            }
+            string json = File.ReadAllText(file);
+            Assert.DoesNotContain("fake-token-a", json); Assert.DoesNotContain("fake-token-b", json);
+            using var restored = new MainForm(() => Task.FromResult(Devices), () => Task.FromResult(EmptyActivity), request => new FakeSession(request), file);
+            var controls = Descendants(restored).ToArray();
+            var profiles = (StudioChoice)controls.Single(c => c.AccessibleName == "Kayıtlı LLM profili");
+            Assert.Equal(2, profiles.Items.Count); Assert.Equal("Yerel Qwen", profiles.AccessibilityObject.Value);
+            Assert.Equal("Birinci prompt", controls.Single(c => c.AccessibleName == "Özet prompt").Text);
+            profiles.AccessibilityObject.Value = "Uzak GLM";
+            Assert.Equal("glm-b", controls.Single(c => c.AccessibleName == "Model").Text);
+            Assert.Equal("fake-token-b", controls.Single(c => c.AccessibleName == "Bearer token · isteğe bağlı").Text);
+        }
+        finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
+        return Task.CompletedTask;
+    });
+
+    [Fact]
+    public Task LegacySingleLlmSettingsMigrateToDefaultProfile() => OnUiThread(() =>
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "vocrec-legacy-" + Guid.NewGuid().ToString("N"));
+        string file = Path.Combine(directory, "settings.json");
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var legacy = new PostProcessingSettings { TranscriptFolder = Path.Combine(directory, "texts"), SummaryFolder = Path.Combine(directory, "summaries"), LlmUrl = "http://localhost", LlmModel = "legacy-model", LlmPrompt = "Eski prompt", ProtectedLlmBearerToken = LlmTokenProtection.Protect("legacy-fake-token") };
+            File.WriteAllText(file, System.Text.Json.JsonSerializer.Serialize(new { Processing = legacy }));
+            using var form = new MainForm(() => Task.FromResult(Devices), () => Task.FromResult(EmptyActivity), request => new FakeSession(request), file);
+            var controls = Descendants(form).ToArray();
+            var picker = (StudioChoice)controls.Single(c => c.AccessibleName == "Kayıtlı LLM profili");
+            Assert.Single(picker.Items); Assert.Equal("Varsayılan", picker.AccessibilityObject.Value);
+            Assert.Equal("legacy-model", controls.Single(c => c.AccessibleName == "Model").Text);
+            Assert.Equal("legacy-fake-token", controls.Single(c => c.AccessibleName == "Bearer token · isteğe bağlı").Text);
+            Assert.Equal(legacy.TranscriptFolder, controls.Single(c => c.AccessibleName == "STT metin çıktı klasörü").Text);
+        }
+        finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
+        return Task.CompletedTask;
+    });
+
     private static IEnumerable<Control> Descendants(Control parent)
     {
         foreach (Control child in parent.Controls)
