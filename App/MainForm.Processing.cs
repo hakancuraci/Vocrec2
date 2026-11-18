@@ -5,7 +5,7 @@ namespace SesKayit;
 
 public sealed partial class MainForm
 {
-    private readonly TextBox transcriptFolder = new(), summaryFolder = new(), llmUrl = new(), llmModel = new(), llmPrompt = new();
+    private readonly TextBox transcriptFolder = new(), summaryFolder = new(), llmUrl = new(), llmModel = new(), llmPrompt = new(), llmBearerToken = new() { UseSystemPasswordChar = true };
     private readonly CheckBox enhanceMic = new() { Text = "Mikrofon konuşma iyileştirme", AutoSize = true };
     private readonly StudioButton saveProcessing = MakeButton("Ayarları kaydet");
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte> queued = new();
@@ -46,6 +46,8 @@ public sealed partial class MainForm
         Row(LabelText("Kayıt bitince STT çalışır. Boş LLM URL: yalnız metin.", 8), 36);
         Folder("STT metin çıktı klasörü", transcriptFolder);
         Field("Qwen / OpenAI uyumlu servis URL", llmUrl);
+        Field("Bearer token (isteğe bağlı)", llmBearerToken);
+        hints.SetToolTip(llmBearerToken, "Token değerini girin. Windows hesabınıza bağlı şifreli kaydedilir. Boş bırakıp kaydetmek tokenı kaldırır.");
         Field("Model adı", llmModel);
         llmPrompt.Multiline = true; llmPrompt.ScrollBars = ScrollBars.Vertical;
         Field("LLM özet prompt", llmPrompt, 100);
@@ -69,6 +71,7 @@ public sealed partial class MainForm
                 var value = new PostProcessingSettings
                 {
                     TranscriptFolder = transcriptFolder.Text.Trim(), SummaryFolder = summaryFolder.Text.Trim(),
+                    ProtectedLlmBearerToken = LlmTokenProtection.Protect(llmBearerToken.Text),
                     LlmUrl = llmUrl.Text.Trim(), LlmModel = llmModel.Text.Trim(), LlmPrompt = llmPrompt.Text,
                     EnhanceMicrophone = enhanceMic.Checked
                 };
@@ -89,6 +92,8 @@ public sealed partial class MainForm
         transcriptFolder.Text = value.TranscriptFolder; summaryFolder.Text = value.SummaryFolder;
         llmUrl.Text = value.LlmUrl; llmModel.Text = value.LlmModel; llmPrompt.Text = value.LlmPrompt;
         enhanceMic.Checked = value.EnhanceMicrophone;
+        try { llmBearerToken.Text = LlmTokenProtection.Unprotect(value.ProtectedLlmBearerToken); }
+        catch (InvalidOperationException ex) { llmBearerToken.Clear(); status.Text = ex.Message; hints.SetToolTip(llmBearerToken, ex.Message); }
     }
 
     private void PersistSettings()
@@ -142,7 +147,8 @@ public sealed partial class MainForm
             {
                 using var runtime = new PortableRuntime();
                 using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(15) };
-                var processor = new RecordingPostProcessor(http, (audio, token) => runtime.TranscribeAsync(audio, cancellationToken: token));
+                var processor = new RecordingPostProcessor(http, (audio, token) => runtime.TranscribeAsync(audio, cancellationToken: token),
+                    saved => LlmTokenProtection.Unprotect(saved.ProtectedLlmBearerToken));
                 await processor.ProcessAsync(file, value, Report);
                 if (File.Exists(pending)) File.Delete(pending);
             }

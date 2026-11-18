@@ -1,10 +1,12 @@
 using System.Net.Http.Json;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 
 namespace SesKayit.Core;
 
-public sealed class RecordingPostProcessor(HttpClient http, Func<string, CancellationToken, Task<string>> transcribe)
+public sealed class RecordingPostProcessor(HttpClient http, Func<string, CancellationToken, Task<string>> transcribe,
+    Func<PostProcessingSettings, string>? resolveBearerToken = null)
 {
     private readonly SemaphoreSlim gate = new(1, 1);
 
@@ -24,11 +26,15 @@ public sealed class RecordingPostProcessor(HttpClient http, Func<string, Cancell
             var endpoint = settings.Endpoint();
             if (endpoint == null || string.IsNullOrWhiteSpace(text)) return;
             progress("LLM özeti hazırlanıyor · " + name);
-            using var response = await http.PostAsJsonAsync(endpoint, new
+            using var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
+            string bearerToken = LlmAuthentication.NormalizeBearerToken(resolveBearerToken?.Invoke(settings));
+            if (bearerToken.Length > 0) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
+            request.Content = JsonContent.Create(new
             {
                 model = settings.LlmModel.Trim(), stream = false, temperature = 0.2,
                 messages = new[] { new { role = "system", content = settings.LlmPrompt }, new { role = "user", content = text } }
-            }, token);
+            });
+            using var response = await http.SendAsync(request, token);
             if (!response.IsSuccessStatusCode) throw new HttpRequestException($"LLM HTTP {(int)response.StatusCode}. Metin korundu: {transcript}");
             using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(token));
             string? summary = json.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString();

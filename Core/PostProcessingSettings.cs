@@ -5,6 +5,7 @@ public sealed record PostProcessingSettings
     public string TranscriptFolder { get; init; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Vocrec2", "Metinler");
     public string SummaryFolder { get; init; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Vocrec2", "Ozetler");
     public string LlmUrl { get; init; } = "";
+    public string ProtectedLlmBearerToken { get; init; } = "";
     public string LlmModel { get; init; } = "";
     public string LlmPrompt { get; init; } = "Aşağıdaki konuşmayı Türkçe özetle. Önemli konuları, kararları ve yapılacak işleri belirt. Metinde bulunmayan bilgi ekleme.";
     public bool EnhanceMicrophone { get; init; } = true;

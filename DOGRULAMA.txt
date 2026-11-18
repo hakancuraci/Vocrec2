@@ -2,15 +2,17 @@ Vocrec2 doğrulama
 
 - .NET 8.0.428 / Linux geliştirme ortamı.
 - Windows hedefli çözüm Release derlemesi: 0 hata, 0 uyarı.
-- Platform bağımsız testler: 29/29 geçti.
+- Platform bağımsız testler (Bearer token dahil): 37/37 geçti.
 - Testler: mevcut mixer/kaynak seçimi; mikrofon uğultu, arka plan,
   konuşma kazancı, stereo ve tepe sınırı; STT metninin LLM öncesi
   yazılması; LLM istek/yanıt formatı; HTTP hatasında metnin korunması;
-  URL doğrulama ve ayarların JSON kalıcılığı.
+  URL doğrulama ve ayarların JSON kalıcılığı; isteğe özel Bearer başlığı,
+  token silindiğinde başlığın kaldırılması, hatalı token doğrulaması.
 - Windows x64 bağımsız paket üretildi; gerekli STT/FFmpeg dosyaları
   paket yerleşiminde kontrol edilir.
-- GitHub Actions Windows runner üzerinde 12 Windows AAC/kayıt testi
-  geçti; 29 genel test ile birlikte toplam 41 test başarılı.
+- Önceki sürümde Windows runner üzerinde 12 Windows AAC/kayıt testi geçti.
+  Bearer token sürümünde bunlara 3 DPAPI/kalıcılık testi eklendi;
+  güncel Windows test sonucu GitHub Actions üzerinden doğrulanır.
 - Paketleme için .NET SDK 8.0.4xx sürümü global.json ile sabitlendi;
   runner üzerindeki daha yeni SDK sürümleri bu projeyi değiştirmez.
 - Manas model ağırlıkları yok; gerçek STT ve fiziksel mikrofon dinleme
