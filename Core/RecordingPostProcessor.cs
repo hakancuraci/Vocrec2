@@ -31,8 +31,14 @@ public sealed class RecordingPostProcessor(HttpClient http, Func<string, Cancell
             if (bearerToken.Length > 0) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
             request.Content = JsonContent.Create(new
             {
-                model = settings.LlmModel.Trim(), stream = false, temperature = 0.2,
-                messages = new[] { new { role = "system", content = settings.LlmPrompt }, new { role = "user", content = text } }
+                model = settings.LlmModel.Trim(), stream = false,
+                chat_template_kwargs = new { enable_thinking = true },
+                messages = new[]
+                {
+                    new { role = "system", content = "Answer the question asked." },
+                    new { role = "user", content = settings.LlmPrompt },
+                    new { role = "user", content = text }
+                }
             });
             using var response = await http.SendAsync(request, token);
             if (!response.IsSuccessStatusCode) throw new HttpRequestException($"LLM HTTP {(int)response.StatusCode}. Metin korundu: {transcript}");

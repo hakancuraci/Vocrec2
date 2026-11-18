@@ -40,7 +40,16 @@ public class PostProcessingTests
                 Assert.Equal("Konuşma metni", await File.ReadAllTextAsync(Path.Combine(root, "record.txt")));
                 using var payload = JsonDocument.Parse(await request.Content!.ReadAsStringAsync());
                 Assert.Equal("qwen-test", payload.RootElement.GetProperty("model").GetString());
-                Assert.Equal("Konuşma metni", payload.RootElement.GetProperty("messages")[1].GetProperty("content").GetString());
+                Assert.False(payload.RootElement.GetProperty("stream").GetBoolean());
+                Assert.True(payload.RootElement.GetProperty("chat_template_kwargs").GetProperty("enable_thinking").GetBoolean());
+                var messages = payload.RootElement.GetProperty("messages");
+                Assert.Equal(3, messages.GetArrayLength());
+                Assert.Equal("system", messages[0].GetProperty("role").GetString());
+                Assert.Equal("Answer the question asked.", messages[0].GetProperty("content").GetString());
+                Assert.Equal("user", messages[1].GetProperty("role").GetString());
+                Assert.Equal("Özetle", messages[1].GetProperty("content").GetString());
+                Assert.Equal("user", messages[2].GetProperty("role").GetString());
+                Assert.Equal("Konuşma metni", messages[2].GetProperty("content").GetString());
                 return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"choices\":[{\"message\":{\"content\":\"Özet\"}}]}", Encoding.UTF8, "application/json") };
             });
             using var http = new HttpClient(handler);
