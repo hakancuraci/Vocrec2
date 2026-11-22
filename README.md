@@ -2,6 +2,12 @@
 
 Vocrec'in Windows ses kaydına, **trslocalwin ile aynı yerel Balbal/Manas STT motoru** ve isteğe bağlı **Qwen REST özeti** eklenmiştir. Kayıt arayüzü korunur; üstteki **STT / LLM ayarları** sekmesi yapılandırma içindir.
 
+## Hazır Windows paketi
+
+[En son Windows ZIP paketini indir](https://github.com/hakancuraci/Vocrec2/releases/latest/download/Vocrec2-Windows-x64.zip) · [Tüm sürümler](https://github.com/hakancuraci/Vocrec2/releases)
+
+`main` dalına her gönderimden sonra .NET 9 derlemesi ve otomatik testler çalışır. Başarılı sonuçta Windows x64 paketi GitHub Releases'a otomatik yayımlanır; bilgisayarınızda `publish` yapmanız gerekmez. Paket sürümü `ana.alt.yama.derleme` biçimindedir. Her sürüm kendi ZIP dosyasını, SHA-256 bilgisini ve kaynak commit bilgisini içerir. Aynı commitin yeniden çalıştırılması aynı sürüm varlıklarını günceller. En son indirme bağlantısı başarıyla yayımlanmış güncel sürümü gösterir.
+
 ## Kullanım
 
 1. Windows x64 paketini yazılabilir bir klasöre açın. `SesKayit.exe`, DLL, `tools`, `_internal`, `configs` ve `licenses` dosyalarını birlikte tutun.

@@ -3,7 +3,7 @@
     <OutputType>WinExe</OutputType><TargetFramework>net9.0-windows</TargetFramework>
     <UseWindowsForms>true</UseWindowsForms><EnableWindowsTargeting>true</EnableWindowsTargeting>
     <ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable>
-    <AssemblyName>SesKayit</AssemblyName><Version>2.3.0</Version>
+    <AssemblyName>SesKayit</AssemblyName><Version>2.3.1</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets/Vocrec2.ico</ApplicationIcon>
   </PropertyGroup>

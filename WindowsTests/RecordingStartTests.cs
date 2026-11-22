@@ -264,6 +264,64 @@ public class RecordingStartTests
         return Task.CompletedTask;
     });
 
+    [Theory]
+    [InlineData("Kayıtlı LLM profili")]
+    [InlineData("Kayıt ses kalitesi")]
+    public Task DropdownCanOpenCancelReopenSelectAndDisposeWithItsWindow(string label) => OnUiThread(() =>
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "vocrec-dropdown-" + Guid.NewGuid().ToString("N"));
+        var nativeErrors = new System.Collections.Concurrent.ConcurrentQueue<Exception>();
+        ThreadExceptionEventHandler errors = (_, e) => nativeErrors.Enqueue(e.Exception);
+        Application.ThreadException += errors;
+        try
+        {
+            using var form = new MainForm(() => Task.FromResult(Devices), () => Task.FromResult(EmptyActivity),
+                request => new FakeSession(request), Path.Combine(directory, "settings.json"));
+            form.ShowInTaskbar = false; form.Show(); Application.DoEvents();
+            if (label == "Kayıtlı LLM profili")
+            {
+                Descendants(form).OfType<Button>().Single(c => c.Name == "ProcessingTab").PerformClick();
+                Descendants(form).OfType<Button>().Single(c => c.Name == "AddLlmProfile").PerformClick();
+            }
+            var choice = (StudioChoice)Descendants(form).Single(c => c.AccessibleName == label);
+            var popup = Assert.IsType<ContextMenuStrip>(choice.ContextMenuStrip);
+            int selected = choice.SelectedIndex;
+            void OpenByMouse()
+            {
+                choice.Focus();
+                int coordinates = ((choice.Height / 2) << 16) | (choice.Width - 16);
+                SendMouseMessage(choice.Handle, 0x0201, (IntPtr)1, (IntPtr)coordinates);
+                SendMouseMessage(choice.Handle, 0x0202, IntPtr.Zero, (IntPtr)coordinates);
+                Application.DoEvents();
+                Assert.True(popup.Visible, "Dropdown must open when its arrow is clicked.");
+            }
+            for (int attempt = 0; attempt < 5; attempt++)
+            {
+                OpenByMouse();
+                popup.Close(attempt % 2 == 0 ? ToolStripDropDownCloseReason.Keyboard : ToolStripDropDownCloseReason.AppClicked);
+                Application.DoEvents();
+                Assert.False(popup.IsDisposed); Assert.Equal(selected, choice.SelectedIndex);
+            }
+            OpenByMouse();
+            ((ToolStripMenuItem)popup.Items[0]).PerformClick();
+            popup.Close(ToolStripDropDownCloseReason.ItemClicked); Application.DoEvents();
+            Assert.Equal(0, choice.SelectedIndex); Assert.False(popup.IsDisposed);
+            OpenByMouse();
+            form.Close(); Application.DoEvents();
+            Assert.True(popup.IsDisposed);
+            Assert.Empty(nativeErrors);
+        }
+        finally
+        {
+            Application.ThreadException -= errors;
+            if (Directory.Exists(directory)) Directory.Delete(directory, true);
+        }
+        return Task.CompletedTask;
+    });
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "SendMessageW")]
+    private static extern IntPtr SendMouseMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
+
     private static IEnumerable<Control> Descendants(Control parent)
     {
         foreach (Control child in parent.Controls)

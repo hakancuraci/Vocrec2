@@ -6,6 +6,7 @@ namespace SesKayit;
 internal sealed class StudioChoice : Control
 {
     private int selectedIndex = -1;
+    private readonly ContextMenuStrip popup;
     public List<object> Items { get; } = [];
     public event EventHandler? SelectedIndexChanged;
     [DefaultValue(-1)]
@@ -25,6 +26,45 @@ internal sealed class StudioChoice : Control
         SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.Selectable, true);
         TabStop = true; Cursor = Cursors.Hand; BackColor = StudioTheme.Field; ForeColor = StudioTheme.Ink;
         Font = new Font("Segoe UI", 10); AccessibleRole = AccessibleRole.ComboBox; Height = 36;
+        popup = new ContextMenuStrip
+        {
+            ShowImageMargin = false, BackColor = StudioTheme.Field, ForeColor = StudioTheme.Ink,
+            Font = Font, Renderer = new ToolStripProfessionalRenderer(new MenuColors())
+        };
+        ContextMenuStrip = popup;
+        popup.Opening += (_, e) =>
+        {
+            e.Cancel = IsDisposed || Disposing || !Enabled || Items.Count == 0;
+            if (e.Cancel) return;
+            popup.Font = Font;
+            // Reuse the popup for this control's lifetime. Closed can fire while Show is
+            // still unwinding; disposing it there can break ToolStrip handle creation.
+            foreach (var old in popup.Items.Cast<ToolStripItem>().ToArray()) old.Dispose();
+            var snapshot = Items.ToArray();
+            for (int i = 0; i < snapshot.Length; i++)
+            {
+                int index = i;
+                var item = new ToolStripMenuItem(snapshot[i].ToString())
+                {
+                    Checked = i == selectedIndex, ForeColor = StudioTheme.Ink, Padding = new Padding(10, 7, 10, 7)
+                };
+                item.Click += (_, _) =>
+                {
+                    if (!IsDisposed && Enabled && index < Items.Count && Equals(Items[index], snapshot[index])) SelectedIndex = index;
+                };
+                popup.Items.Add(item);
+            }
+        };
+        popup.Closed += (_, e) =>
+        {
+            if (IsDisposed || Disposing || !IsHandleCreated ||
+                e.CloseReason is not (ToolStripDropDownCloseReason.Keyboard or ToolStripDropDownCloseReason.ItemClicked)) return;
+            // Restore focus after WinForms finishes closing, and respect outside clicks.
+            BeginInvoke((Action)(() =>
+            {
+                if (!IsDisposed && !Disposing && IsHandleCreated && !popup.IsDisposed && !popup.Visible) Focus();
+            }));
+        };
     }
     protected override void OnPaint(PaintEventArgs e)
     {
@@ -40,16 +80,13 @@ internal sealed class StudioChoice : Control
     }
     private void OpenMenu()
     {
-        if (!Enabled || Items.Count == 0) return;
-        var menu = new ContextMenuStrip { ShowImageMargin = false, BackColor = StudioTheme.Field, ForeColor = StudioTheme.Ink, Font = Font, Renderer = new ToolStripProfessionalRenderer(new MenuColors()) };
-        for (int i = 0; i < Items.Count; i++)
-        {
-            int index = i;
-            var item = new ToolStripMenuItem(Items[i].ToString()) { Checked = i == selectedIndex, ForeColor = StudioTheme.Ink, Padding = new Padding(10, 7, 10, 7) };
-            item.Click += (_, _) => SelectedIndex = index; menu.Items.Add(item);
-        }
-        menu.Closed += (_, _) => { menu.Dispose(); Focus(); };
-        menu.Show(this, new Point(0, Height));
+        if (IsDisposed || Disposing || !Enabled || Items.Count == 0 || popup.IsDisposed || popup.Visible) return;
+        popup.Show(this, new Point(0, Height));
+    }
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing) popup.Dispose();
+        base.Dispose(disposing);
     }
     protected override void OnMouseClick(MouseEventArgs e) { base.OnMouseClick(e); if (e.Button == MouseButtons.Left) { Focus(); OpenMenu(); } }
     protected override void OnGotFocus(EventArgs e) { base.OnGotFocus(e); Invalidate(); }
@@ -74,7 +111,7 @@ internal sealed class StudioChoice : Control
             get => owner.selectedIndex >= 0 ? owner.Items[owner.selectedIndex].ToString() : "";
             set { int index = owner.Items.FindIndex(i => i.ToString() == value); if (index >= 0) owner.SelectedIndex = index; }
         }
-        public override string DefaultAction => "Kalite seçeneklerini aç";
+        public override string DefaultAction => "Seçenekleri aç";
         public override void DoDefaultAction() => owner.OpenMenu();
     }
     private sealed class MenuColors : ProfessionalColorTable
