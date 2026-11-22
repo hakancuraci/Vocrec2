@@ -28,8 +28,9 @@ Vocrec2 doğrulama
 
 - Açılır menünün seçim yapmadan tekrar açılıp kapanması ve açık menüyle
   pencerenin kapatılması için Windows UI Automation regresyon testleri eklendi.
-- Başarılı main gönderimlerinde sürüm numaralı Windows paketi Releases
-  altında otomatik yayımlanır. Başarısız testlerden release üretilmez.
+- Otomatik GitHub Release yayını kaldırıldı. Derleme, test ve Windows
+  Actions paketi korunur. Sürüm Version.props dosyasından alınır;
+  EXE sürümü, paket configi ve kaynak commit kimliği CI içinde karşılaştırılır.
 
 - STT çıktıları .md, LLM özetleri .ozet.md olarak UTF-8 kaydedilir.
   Eski TXT önbellekleri ve tamamlanmış iş durumları Markdown çıktısına

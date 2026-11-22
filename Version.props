@@ -1,0 +1,6 @@
+<Project>
+  <PropertyGroup>
+    <!-- Application version shared by local builds and GitHub Actions. -->
+    <Version>2.3.4</Version>
+  </PropertyGroup>
+</Project>

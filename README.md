@@ -6,7 +6,15 @@ Vocrec'in Windows ses kaydına, **trslocalwin ile aynı yerel Balbal/Manas STT m
 
 [En son Windows ZIP paketini indir](https://github.com/hakancuraci/Vocrec2/releases/latest/download/Vocrec2-Windows-x64.zip) · [Tüm sürümler](https://github.com/hakancuraci/Vocrec2/releases)
 
-`main` dalına her gönderimden sonra .NET 9 derlemesi ve otomatik testler çalışır. Başarılı sonuçta Windows x64 paketi GitHub Releases'a otomatik yayımlanır; bilgisayarınızda `publish` yapmanız gerekmez. Paket sürümü `ana.alt.yama.derleme` biçimindedir. Her sürüm kendi ZIP dosyasını, SHA-256 bilgisini ve kaynak commit bilgisini içerir. Aynı commitin yeniden çalıştırılması aynı sürüm varlıklarını günceller. En son indirme bağlantısı başarıyla yayımlanmış güncel sürümü gösterir.
+Her gönderimden sonra .NET 9 derlemesi ve otomatik testler çalışır; **otomatik GitHub Release oluşturulmaz**. Test edilen Windows x64 paketi başarılı [GitHub Actions](https://github.com/hakancuraci/Vocrec2/actions/workflows/windows.yml) çalışmasının **Artifacts → Vocrec2-Windows-x64** bölümünden indirilebilir. Yukarıdaki Releases bağlantısı önceki yayımlanmış sürümleri gösterir; güncel kaynak kodla aynı sürümde olmayabilir.
+
+## Uygulama sürümü
+
+Sürüm numarasının tek kaynağı depo kökündeki [`Version.props`](Version.props) dosyasıdır. Güncel uygulama sürümü **2.3.4**. Yeni uygulama sürümünde bu dosyadaki `<Version>` değerini artırıp yeniden derleyin; yerel derleme ve Actions aynı numarayı kullanır. Workflow çalışma numarası sürüme eklenmez.
+
+Uygulamanın sağ üst köşesinde sürüm numarası ve kısa kaynak commit kimliği görünür. Üzerine gelince tam commit gösterilir. Sürümü GitHub'daki `Version.props` ile, commit kimliğini [main geçmişi](https://github.com/hakancuraci/Vocrec2/commits/main/) ile karşılaştırabilirsiniz. Windows'ta `SesKayit.exe → Özellikler → Ayrıntılar` altında dosya sürümü `2.3.4.0`, ürün sürümü `2.3.4+<commit>` biçimindedir. Git bilgisi olmadan indirilen kaynak ZIP'inden yapılan yerel derlemelerde commit bilgisi bulunmayabilir.
+
+`Version.props` derleme ve publish çıktısına da kopyalanır; Actions paketindeki `BUILD-INFO.txt` ayrıca sürümü ve tam commit kimliğini içerir. Arayüz sürümü EXE'ye derleme sırasında gömülür; EXE yanındaki config dosyasını değiştirmek çalışan uygulamanın sürümünü değiştirmez.
 
 ## Kullanım
 

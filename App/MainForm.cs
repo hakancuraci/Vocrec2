@@ -49,7 +49,7 @@ public sealed partial class MainForm : Form
         this.readActivity = readActivity;
         this.createRecording = createRecording;
         if (settingsFile != null) settingsPath = settingsFile;
-        Text = "Vocrec2 · Ses kayıt stüdyosu";
+        Text = $"Vocrec2 v{AppVersion.Number} · Ses kayıt stüdyosu";
         var windowIcon = (Icon)AppLogo.Icon.Clone(); Icon = windowIcon;
         Disposed += (_, _) => windowIcon.Dispose();
         BackColor = Bg; ForeColor = StudioTheme.Ink; Font = new Font("Segoe UI", 10);

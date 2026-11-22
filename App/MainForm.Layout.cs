@@ -37,7 +37,9 @@ public sealed partial class MainForm
         name.AccessibleName = "Uygulama başlığı"; name.Padding = new Padding(0, 3, 0, 3); header.Controls.Add(name);
         var tagline = LabelText("Sistem sesi ve mikrofon. Tek bir kayıtta.", 9); tagline.Dock = DockStyle.None; tagline.AutoSize = true; tagline.AutoEllipsis = false;
         tagline.AccessibleName = "Uygulama açıklaması"; header.Controls.Add(tagline);
-        var tag = LabelText("SES KAYIT STÜDYOSU\n48 kHz stereo  /  AAC", 9); tag.TextAlign = ContentAlignment.MiddleRight;
+        var tag = LabelText($"v{AppVersion.Number}\nCommit: {AppVersion.ShortCommit}", 9); tag.TextAlign = ContentAlignment.MiddleRight;
+        tag.AccessibleName = "Uygulama sürümü";
+        hints.SetToolTip(tag, $"Sürüm: {AppVersion.Number}\nKaynak commit: {AppVersion.Commit}\nRepodaki Version.props ve commit geçmişiyle karşılaştırabilirsiniz.");
         tag.Dock = DockStyle.Right; tag.Width = 205; header.Controls.Add(tag); root.Controls.Add(header, 0, 0);
 
         var automationCard = new StudioCard { Dock = DockStyle.Fill, Padding = new Padding(16, 8, 16, 8), Margin = new Padding(0, 8, 0, 10) };
