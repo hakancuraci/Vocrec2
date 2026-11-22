@@ -20,8 +20,10 @@ public sealed class RecordingPostProcessor(HttpClient http, Func<string, Cancell
             progress("STT · " + Path.GetFileName(audio));
             Directory.CreateDirectory(settings.TranscriptFolder);
             string name = Path.GetFileNameWithoutExtension(audio);
-            string transcript = Path.Combine(settings.TranscriptFolder, name + ".txt");
-            string text = File.Exists(transcript) ? await File.ReadAllTextAsync(transcript, token) : await transcribe(audio, token);
+            string transcript = Path.Combine(settings.TranscriptFolder, name + ".md");
+            string legacyTranscript = Path.Combine(settings.TranscriptFolder, name + ".txt");
+            string? cachedTranscript = File.Exists(transcript) ? transcript : File.Exists(legacyTranscript) ? legacyTranscript : null;
+            string text = cachedTranscript != null ? await File.ReadAllTextAsync(cachedTranscript, token) : await transcribe(audio, token);
             await WriteAtomicAsync(transcript, text, token);
             progress("Metin kaydedildi: " + transcript);
             if (settings.Endpoint() == null || string.IsNullOrWhiteSpace(text)) return;
@@ -29,7 +31,8 @@ public sealed class RecordingPostProcessor(HttpClient http, Func<string, Cancell
             string stateFolder = Path.Combine(settings.TranscriptFolder, ".vocrec2");
             Directory.CreateDirectory(stateFolder);
             string statePath = Path.Combine(stateFolder, name + ".summary.json");
-            string fallback = Path.Combine(settings.SummaryFolder, name + ".ozet.txt");
+            string fallback = Path.Combine(settings.SummaryFolder, name + ".ozet.md");
+            string legacyFallback = Path.Combine(settings.SummaryFolder, name + ".ozet.txt");
             SummaryState? state = null;
             if (File.Exists(statePath))
             {
@@ -38,12 +41,22 @@ public sealed class RecordingPostProcessor(HttpClient http, Func<string, Cancell
             }
             if (state?.OutputPath != null && File.Exists(state.OutputPath))
             {
+                if (!string.Equals(Path.GetExtension(state.OutputPath), ".md", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Resume older completed jobs without transcribing or asking the LLM again.
+                    string previous = await File.ReadAllTextAsync(state.OutputPath, token);
+                    string title = state.Title ?? Path.GetFileNameWithoutExtension(state.OutputPath).Replace(".ozet", "");
+                    string migrated = await SummaryFileNames.WriteUniqueAsync(settings.SummaryFolder, title, previous, token);
+                    state = state with { OutputPath = migrated };
+                    await WriteAtomicAsync(statePath, JsonSerializer.Serialize(state), token);
+                }
                 progress("Özet kaydedildi: " + state.OutputPath); return;
             }
             if (state == null)
             {
                 progress("LLM özeti hazırlanıyor · " + name);
-                string summary = File.Exists(fallback) ? await File.ReadAllTextAsync(fallback, token) : await CallLlmAsync(settings, settings.LlmPrompt, text, token);
+                string? cachedSummary = File.Exists(fallback) ? fallback : File.Exists(legacyFallback) ? legacyFallback : null;
+                string summary = cachedSummary != null ? await File.ReadAllTextAsync(cachedSummary, token) : await CallLlmAsync(settings, settings.LlmPrompt, text, token);
                 state = new SummaryState(summary);
                 await WriteAtomicAsync(statePath, JsonSerializer.Serialize(state), token);
             }

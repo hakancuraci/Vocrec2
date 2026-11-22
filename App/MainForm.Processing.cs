@@ -30,10 +30,10 @@ public sealed partial class MainForm
         foreach (int height in new[] { 26, 30, 22, 42, 12, 22 }) outputGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, height));
         outputGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         outputGrid.Controls.Add(Heading("Çıktı klasörleri", 12), 0, 0);
-        outputGrid.Controls.Add(LabelText("Her kayıt için ayrı metin ve özet.", 9), 0, 1);
-        outputGrid.Controls.Add(LabelText("STT metin dosyası", 9), 0, 2);
+        outputGrid.Controls.Add(LabelText("Metin ve özetler Markdown (.md) olarak kaydedilir.", 9), 0, 1);
+        outputGrid.Controls.Add(LabelText("STT metni (.md)", 9), 0, 2);
         outputGrid.Controls.Add(FolderField(transcriptFolder, "STT metin çıktı klasörü"), 0, 3);
-        outputGrid.Controls.Add(LabelText("LLM özet dosyası", 9), 0, 5);
+        outputGrid.Controls.Add(LabelText("LLM özeti (.md)", 9), 0, 5);
         var summaryHost = Grid(1, 2);
         summaryHost.RowStyles.Add(new RowStyle(SizeType.Absolute, 42)); summaryHost.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         summaryHost.Controls.Add(FolderField(summaryFolder, "LLM özet çıktı klasörü"), 0, 0);

@@ -22,7 +22,7 @@ public static class SummaryFileNames
         title = Normalize(title);
         for (int index = 1; index <= 10000; index++)
         {
-            string path = Path.Combine(folder, title + (index == 1 ? "" : "_" + index) + ".ozet.txt");
+            string path = Path.Combine(folder, title + (index == 1 ? "" : "_" + index) + ".ozet.md");
             FileStream file;
             try { file = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None, 4096, useAsync: true); }
             catch (IOException) when (File.Exists(path)) { continue; }
