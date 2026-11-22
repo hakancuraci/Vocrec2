@@ -277,7 +277,8 @@ public class RecordingStartTests
         {
             using var form = new MainForm(() => Task.FromResult(Devices), () => Task.FromResult(EmptyActivity),
                 request => new FakeSession(request), Path.Combine(directory, "settings.json"));
-            form.ShowInTaskbar = false; form.Show(); Application.DoEvents();
+            form.ShowInTaskbar = false; form.StartPosition = FormStartPosition.Manual; form.Location = Point.Empty; form.TopMost = true;
+            form.Show(); form.Activate(); form.BringToFront(); Application.DoEvents();
             if (label == "Kayıtlı LLM profili")
             {
                 Descendants(form).OfType<Button>().Single(c => c.Name == "ProcessingTab").PerformClick();
@@ -285,15 +286,23 @@ public class RecordingStartTests
             }
             var choice = (StudioChoice)Descendants(form).Single(c => c.AccessibleName == label);
             var popup = Assert.IsType<ContextMenuStrip>(choice.ContextMenuStrip);
-            int selected = choice.SelectedIndex;
+            int selected = choice.SelectedIndex, mouseClicks = 0, opening = 0, opened = 0;
+            var closes = new List<string>();
+            choice.MouseClick += (_, _) => mouseClicks++;
+            popup.Opening += (_, _) => opening++;
+            popup.Opened += (_, _) => opened++;
+            popup.Closed += (_, e) => closes.Add(e.CloseReason.ToString());
             void OpenByMouse()
             {
                 choice.Focus();
+                var point = choice.PointToScreen(new Point(choice.Width - 16, choice.Height / 2));
+                SetMousePosition(point.X, point.Y);
                 int coordinates = ((choice.Height / 2) << 16) | (choice.Width - 16);
                 SendMouseMessage(choice.Handle, 0x0201, (IntPtr)1, (IntPtr)coordinates);
                 SendMouseMessage(choice.Handle, 0x0202, IntPtr.Zero, (IntPtr)coordinates);
                 Application.DoEvents();
-                Assert.True(popup.Visible, "Dropdown must open when its arrow is clicked.");
+                Assert.Empty(nativeErrors);
+                Assert.True(popup.Visible, $"Dropdown must open when clicked: clicks={mouseClicks}, opening={opening}, opened={opened}, closed={string.Join(",", closes)}, handle={choice.IsHandleCreated}, visible={choice.Visible}.");
             }
             for (int attempt = 0; attempt < 5; attempt++)
             {
@@ -318,6 +327,9 @@ public class RecordingStartTests
         }
         return Task.CompletedTask;
     });
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "SetCursorPos")]
+    private static extern bool SetMousePosition(int x, int y);
 
     [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "SendMessageW")]
     private static extern IntPtr SendMouseMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
