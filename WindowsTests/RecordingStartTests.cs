@@ -286,36 +286,33 @@ public class RecordingStartTests
             }
             var choice = (StudioChoice)Descendants(form).Single(c => c.AccessibleName == label);
             var popup = Assert.IsType<ContextMenuStrip>(choice.ContextMenuStrip);
-            int selected = choice.SelectedIndex, mouseClicks = 0, opening = 0, opened = 0;
+            int selected = choice.SelectedIndex, opening = 0, opened = 0;
             var closes = new List<string>();
-            choice.MouseClick += (_, _) => mouseClicks++;
             popup.Opening += (_, _) => opening++;
             popup.Opened += (_, _) => opened++;
             popup.Closed += (_, e) => closes.Add(e.CloseReason.ToString());
-            void OpenByMouse()
+            void OpenPopup()
             {
                 choice.Focus();
-                var point = choice.PointToScreen(new Point(choice.Width - 16, choice.Height / 2));
-                SetMousePosition(point.X, point.Y);
-                int coordinates = ((choice.Height / 2) << 16) | (choice.Width - 16);
-                SendMouseMessage(choice.Handle, 0x0201, (IntPtr)1, (IntPtr)coordinates);
-                SendMouseMessage(choice.Handle, 0x0202, IntPtr.Zero, (IntPtr)coordinates);
+                // UI Automation invokes the same opening action as the arrow click,
+                // without relying on physical cursor input on a headless runner.
+                choice.AccessibilityObject.DoDefaultAction();
                 Application.DoEvents();
                 Assert.Empty(nativeErrors);
-                Assert.True(popup.Visible, $"Dropdown must open when clicked: clicks={mouseClicks}, opening={opening}, opened={opened}, closed={string.Join(",", closes)}, handle={choice.IsHandleCreated}, visible={choice.Visible}.");
+                Assert.True(popup.Visible, $"Dropdown must open: opening={opening}, opened={opened}, closed={string.Join(",", closes)}, handle={choice.IsHandleCreated}, visible={choice.Visible}.");
             }
             for (int attempt = 0; attempt < 5; attempt++)
             {
-                OpenByMouse();
+                OpenPopup();
                 popup.Close(attempt % 2 == 0 ? ToolStripDropDownCloseReason.Keyboard : ToolStripDropDownCloseReason.AppClicked);
                 Application.DoEvents();
                 Assert.False(popup.IsDisposed); Assert.Equal(selected, choice.SelectedIndex);
             }
-            OpenByMouse();
+            OpenPopup();
             ((ToolStripMenuItem)popup.Items[0]).PerformClick();
             popup.Close(ToolStripDropDownCloseReason.ItemClicked); Application.DoEvents();
             Assert.Equal(0, choice.SelectedIndex); Assert.False(popup.IsDisposed);
-            OpenByMouse();
+            OpenPopup();
             form.Close(); Application.DoEvents();
             Assert.True(popup.IsDisposed);
             Assert.Empty(nativeErrors);
@@ -327,12 +324,6 @@ public class RecordingStartTests
         }
         return Task.CompletedTask;
     });
-
-    [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "SetCursorPos")]
-    private static extern bool SetMousePosition(int x, int y);
-
-    [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "SendMessageW")]
-    private static extern IntPtr SendMouseMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
 
     private static IEnumerable<Control> Descendants(Control parent)
     {

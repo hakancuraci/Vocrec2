@@ -27,6 +27,6 @@ Vocrec2 doğrulama
   dosya çakışması ve güvenli 5 kelimelik ad kuralları test edildi.
 
 - Açılır menünün seçim yapmadan tekrar açılıp kapanması ve açık menüyle
-  pencerenin kapatılması için Windows fare mesajlı regresyon testleri eklendi.
+  pencerenin kapatılması için Windows UI Automation regresyon testleri eklendi.
 - Başarılı main gönderimlerinde sürüm numaralı Windows paketi Releases
   altında otomatik yayımlanır. Başarısız testlerden release üretilmez.
