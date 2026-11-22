@@ -16,7 +16,6 @@ public sealed partial class MainForm
     private string PendingDirectory => Path.Combine(Path.GetDirectoryName(settingsPath)!, "pending");
     private sealed record PendingJob(string Audio, PostProcessingSettings Settings);
     private Task processingTask = Task.CompletedTask;
-    private bool updatingPromptScroll;
 
     private Control ProcessingCard()
     {
@@ -77,7 +76,10 @@ public sealed partial class MainForm
         var nameField = InputField("Profil adı", profileName, "Örn. Yerel Qwen"); nameField.Margin = new Padding(0, 0, 12, 6);
         identity.Controls.Add(nameField, 0, 0); identity.Controls.Add(tokenGrid, 1, 0); llmGrid.Controls.Add(identity, 0, 4);
         hints.SetToolTip(llmBearerToken, "Windows hesabınıza bağlı şifreli kaydedilir. Boş bırakıp kaydetmek tokenı kaldırır.");
+        // Configure native edit styles before handle creation. Changing ScrollBars
+        // inside TextChanged can destroy the HWND while Windows is processing WM_PASTE.
         llmPrompt.Multiline = true; llmPrompt.ScrollBars = ScrollBars.Vertical;
+        llmPrompt.MaxLength = int.MaxValue; llmPrompt.AcceptsReturn = true;
         llmGrid.Controls.Add(InputField("Özet prompt", llmPrompt, "Özetin dili, ayrıntı seviyesi ve içeriği…"), 0, 5);
         llmGrid.Controls.Add(processingSaveState, 0, 6);
         var actions = Grid(2, 1); actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 48)); actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 52));
@@ -123,26 +125,10 @@ public sealed partial class MainForm
         grid.Controls.Add(field, 0, 1); configuration.Add(input); return grid;
     }
 
-    private void UpdatePromptScrollBars()
-    {
-        if (updatingPromptScroll || !llmPrompt.IsHandleCreated) return;
-        updatingPromptScroll = true;
-        try
-        {
-            int lines = llmPrompt.GetLineFromCharIndex(llmPrompt.TextLength) + 1;
-            int visible = Math.Max(1, llmPrompt.ClientSize.Height / llmPrompt.Font.Height);
-            llmPrompt.ScrollBars = lines > visible ? ScrollBars.Vertical : ScrollBars.None;
-        }
-        finally { updatingPromptScroll = false; }
-    }
-
     private void InitializeProcessingControls()
     {
         Shown += (_, _) => ResumePending(useCurrentSettings: false);
         profilePicker.SelectedIndexChanged += (_, _) => SwitchLlmProfile();
-        llmPrompt.HandleCreated += (_, _) => UpdatePromptScrollBars();
-        llmPrompt.SizeChanged += (_, _) => UpdatePromptScrollBars();
-        llmPrompt.TextChanged += (_, _) => UpdatePromptScrollBars();
         foreach (var field in new[] { transcriptFolder, summaryFolder, llmUrl, llmModel, llmPrompt, llmBearerToken, profileName })
             field.TextChanged += (_, _) => { processingSaveState.Text = "Değişiklikleri uygulamak için kaydedin."; processingSaveState.ForeColor = StudioTheme.Muted; };
         enhanceMic.CheckedChanged += (_, _) => SaveOutputPreferences();

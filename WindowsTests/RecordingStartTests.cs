@@ -325,6 +325,87 @@ public class RecordingStartTests
         return Task.CompletedTask;
     });
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public Task LongPromptPasteCanReplaceExistingTextAndSurviveRestart(bool startWithSavedLongPrompt) => OnUiThread(() =>
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "vocrec-paste-" + Guid.NewGuid().ToString("N"));
+        string file = Path.Combine(directory, "settings.json");
+        string longLines = string.Concat(Enumerable.Repeat("Talimat: Türkçe özetle; tüm kararları, aksiyonları ve tarihleri koru.\r\n", 1200));
+        string longSingleLine = string.Concat(Enumerable.Repeat("Yeni uzun prompt: çğışöü ve ayrıntılı proje notları korunmalı. ", 1400));
+        string finalPrompt = longSingleLine + "\r\n" + longLines;
+        var nativeErrors = new System.Collections.Concurrent.ConcurrentQueue<Exception>();
+        ThreadExceptionEventHandler errors = (_, e) => nativeErrors.Enqueue(e.Exception);
+        IDataObject? previousClipboard = Clipboard.GetDataObject();
+        Application.ThreadException += errors;
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var initial = new PostProcessingSettings
+            {
+                TranscriptFolder = Path.Combine(directory, "texts"), SummaryFolder = Path.Combine(directory, "summaries"),
+                LlmPrompt = startWithSavedLongPrompt ? longLines : ""
+            };
+            File.WriteAllText(file, System.Text.Json.JsonSerializer.Serialize(new { Processing = initial }));
+            using (var form = new MainForm(() => Task.FromResult(Devices), () => Task.FromResult(EmptyActivity),
+                request => new FakeSession(request), file))
+            {
+                form.ShowInTaskbar = false; form.Show();
+                Descendants(form).OfType<Button>().Single(c => c.Name == "ProcessingTab").PerformClick();
+                Application.DoEvents();
+                var prompt = (TextBox)Descendants(form).Single(c => c.AccessibleName == "Özet prompt");
+                Assert.True(longLines.Length > 32767 && longSingleLine.Length > 32767);
+                Assert.Equal(initial.LlmPrompt.Length, prompt.TextLength);
+                IntPtr originalHandle = prompt.Handle;
+                int destroyed = 0;
+                prompt.HandleDestroyed += (_, _) => destroyed++;
+                foreach (string payload in new[] { longLines, longSingleLine, "Kısa bir prompt.", "", finalPrompt })
+                {
+                    prompt.Focus(); prompt.SelectAll();
+                    if (payload.Length == 0) prompt.Clear();
+                    else
+                    {
+                        Clipboard.SetDataObject(payload, true, 10, 25);
+                        prompt.Paste(); // Exercise the native WM_PASTE / EN_CHANGE path.
+                    }
+                    Application.DoEvents();
+                    Assert.Empty(nativeErrors);
+                    Assert.Equal(payload.Length, prompt.TextLength);
+                    Assert.True(prompt.Text == payload, "Pasted prompt must remain intact.");
+                    Assert.Equal(originalHandle, prompt.Handle);
+                    Assert.Equal(0, destroyed);
+                }
+                form.Size = form.MinimumSize; Application.DoEvents();
+                Assert.Equal(originalHandle, prompt.Handle);
+                Assert.Equal(0, destroyed);
+                form.Close();
+            }
+            using var restored = new MainForm(() => Task.FromResult(Devices), () => Task.FromResult(EmptyActivity),
+                request => new FakeSession(request), file);
+            restored.ShowInTaskbar = false; restored.Show();
+            Descendants(restored).OfType<Button>().Single(c => c.Name == "ProcessingTab").PerformClick();
+            Application.DoEvents();
+            var reopenedPrompt = Descendants(restored).Single(c => c.AccessibleName == "Özet prompt");
+            Assert.Equal(finalPrompt.Length, reopenedPrompt.Text.Length);
+            Assert.True(reopenedPrompt.Text == finalPrompt, "Saved long prompt must survive restarting the form.");
+            restored.Close(); Application.DoEvents();
+            Assert.Empty(nativeErrors);
+        }
+        finally
+        {
+            Application.ThreadException -= errors;
+            try
+            {
+                if (previousClipboard != null) Clipboard.SetDataObject(previousClipboard, true, 10, 25);
+                else Clipboard.Clear();
+            }
+            catch (System.Runtime.InteropServices.ExternalException) { /* Best effort clipboard restoration. */ }
+            if (Directory.Exists(directory)) Directory.Delete(directory, true);
+        }
+        return Task.CompletedTask;
+    });
+
     private static IEnumerable<Control> Descendants(Control parent)
     {
         foreach (Control child in parent.Controls)

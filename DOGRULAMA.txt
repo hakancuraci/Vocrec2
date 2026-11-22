@@ -34,3 +34,8 @@ Vocrec2 doğrulama
 - STT çıktıları .md, LLM özetleri .ozet.md olarak UTF-8 kaydedilir.
   Eski TXT önbellekleri ve tamamlanmış iş durumları Markdown çıktısına
   yeniden STT/LLM çağrısı gerektirmeden taşınarak devam edebilir.
+
+- Boş prompt alanına ve önceden kaydedilmiş uzun prompt üzerine gerçek
+  Windows panosundan çok satırlı/tek satırlı uzun metin yapıştırma,
+  temizleme, yeniden yapıştırma ve kapanış sonrası geri yükleme testleri
+  eklendi. Düzenleme sırasında native metin kutusu yeniden oluşturulmaz.
