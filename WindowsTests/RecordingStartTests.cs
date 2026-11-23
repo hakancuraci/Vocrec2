@@ -418,13 +418,14 @@ public class RecordingStartTests
         var options = new PostProcessingSettings { TranscriptFolder = Path.Combine(directory, "text"), SummaryFolder = Path.Combine(directory, "summary") };
         File.WriteAllText(settingsFile, System.Text.Json.JsonSerializer.Serialize(new { Folder = directory, Processing = options }));
         const string title = "Haftalık Proje Toplantısı";
+        string datedTitle = RecordingDates.WithPrefix(title, DateOnly.FromDateTime(DateTime.Now));
         FakeSession? recording = null;
         bool named = !clearDuringRecording;
         string? processedFile = null;
         try
         {
             // Existing content must survive; a new recording uses the next available name.
-            File.WriteAllText(Path.Combine(directory, title + ".m4a"), "previous audio");
+            File.WriteAllText(Path.Combine(directory, datedTitle + ".m4a"), "previous audio");
             using (var form = new MainForm(() => Task.FromResult(Devices), () => Task.FromResult(EmptyActivity),
                 request => recording = new FakeSession(request), settingsFile,
                 (file, _, _, useName) =>
@@ -444,9 +445,9 @@ public class RecordingStartTests
                 File.WriteAllText(recording!.OutputPath, "new audio");
                 await form.StopAsync(); await form.ProcessingCompletion.WaitAsync(TimeSpan.FromSeconds(5));
                 Assert.Equal("", input.Text); Assert.True(input.Enabled);
-                Assert.Equal(named ? title + "_2.m4a" : "test.m4a", Path.GetFileName(processedFile));
+                Assert.Equal(named ? datedTitle + "_2.m4a" : RecordingDates.WithPrefix("test.m4a", DateOnly.FromDateTime(DateTime.Now)), Path.GetFileName(processedFile));
                 Assert.Equal("new audio", File.ReadAllText(processedFile!));
-                Assert.Equal("previous audio", File.ReadAllText(Path.Combine(directory, title + ".m4a")));
+                Assert.Equal("previous audio", File.ReadAllText(Path.Combine(directory, datedTitle + ".m4a")));
                 using var pending = System.Text.Json.JsonDocument.Parse(File.ReadAllText(Assert.Single(Directory.GetFiles(Path.Combine(directory, "pending"), "*.json"))));
                 Assert.Equal(named, pending.RootElement.GetProperty("UseRecordingName").GetBoolean());
                 Assert.Equal(processedFile, pending.RootElement.GetProperty("Audio").GetString());
@@ -511,7 +512,7 @@ public class RecordingStartTests
         public FakeSession(RecordingRequest request)
         {
             Automatic = request.Automatic;
-            OutputPath = Path.Combine(request.Folder, "test.m4a");
+            OutputPath = Path.Combine(request.Folder, RecordingDates.WithPrefix("test.m4a", DateOnly.FromDateTime(DateTime.Now)));
         }
         public bool Automatic { get; }
         public AudioMixer Mixer { get; } = new([new(new Silence(), false)]);

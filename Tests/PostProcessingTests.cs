@@ -38,7 +38,7 @@ public class PostProcessingTests
             int calls = 0;
             using var handler = new Handler(async request =>
             {
-                Assert.Equal("Konuşma metni", await File.ReadAllTextAsync(Path.Combine(root, "record.md")));
+                Assert.Equal("Konuşma metni", await File.ReadAllTextAsync(Path.Combine(root, Dated("record.md"))));
                 using var payload = JsonDocument.Parse(await request.Content!.ReadAsStringAsync());
                 Assert.Equal("qwen-test", payload.RootElement.GetProperty("model").GetString());
                 Assert.False(payload.RootElement.GetProperty("stream").GetBoolean());
@@ -62,7 +62,7 @@ public class PostProcessingTests
             using var http = new HttpClient(handler);
             await new RecordingPostProcessor(http, (_, _) => Task.FromResult("Konuşma metni")).ProcessAsync("record.m4a", settings, _ => { });
             Assert.Equal(2, calls);
-            Assert.Equal("Özet metni", await File.ReadAllTextAsync(Path.Combine(root, "summary", "Proje Planlama Kararları.ozet.md")));
+            Assert.Equal("Özet metni", await File.ReadAllTextAsync(Path.Combine(root, "summary", Dated("Proje Planlama Kararları.ozet.md"))));
         }
         finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
     }
@@ -80,8 +80,8 @@ public class PostProcessingTests
             var processor = new RecordingPostProcessor(http, (_, _) => { calls++; return Task.FromResult("Kalıcı metin"); });
             for (int i = 0; i < 2; i++) await Assert.ThrowsAsync<HttpRequestException>(() => processor.ProcessAsync("record.m4a", settings, _ => { }));
             Assert.Equal(1, calls);
-            Assert.Equal("Kalıcı metin", await File.ReadAllTextAsync(Path.Combine(root, "record.md")));
-            Assert.False(File.Exists(Path.Combine(root, "record.ozet.md")));
+            Assert.Equal("Kalıcı metin", await File.ReadAllTextAsync(Path.Combine(root, Dated("record.md"))));
+            Assert.False(File.Exists(Path.Combine(root, Dated("record.ozet.md"))));
         }
         finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
     }
@@ -94,7 +94,7 @@ public class PostProcessingTests
         {
             using var http = new HttpClient(new Handler(_ => throw new Exception("Unexpected network call")));
             await new RecordingPostProcessor(http, (_, _) => Task.FromResult("metin")).ProcessAsync("record.m4a", new() { TranscriptFolder = root, SummaryFolder = root }, _ => { });
-            Assert.Equal("metin", File.ReadAllText(Path.Combine(root, "record.md")));
+            Assert.Equal("metin", File.ReadAllText(Path.Combine(root, Dated("record.md"))));
         }
         finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
     }
@@ -160,7 +160,7 @@ public class PostProcessingTests
             using var http = new HttpClient(handler);
             var first = new RecordingPostProcessor(http, (_, _) => { stt++; return Task.FromResult("metin"); });
             await Assert.ThrowsAsync<IOException>(() => first.ProcessAsync("record.m4a", settings, _ => { }));
-            Assert.Equal("Korunan özet", await File.ReadAllTextAsync(Path.Combine(root, "record.ozet.md")));
+            Assert.Equal("Korunan özet", await File.ReadAllTextAsync(Path.Combine(root, Dated("record.ozet.md"))));
             var resumed = new RecordingPostProcessor(http, (_, _) => throw new Exception("STT must not repeat"));
             await resumed.ProcessAsync("record.m4a", settings, _ => { });
             string output = Assert.Single(Directory.GetFiles(root, "*.ozet.md"));
@@ -190,8 +190,8 @@ public class PostProcessingTests
             var processor = new RecordingPostProcessor(http, (audio, _) => Task.FromResult(audio));
             await processor.ProcessAsync("first.m4a", settings, _ => { });
             await processor.ProcessAsync("second.m4a", settings, _ => { });
-            Assert.Equal("first.m4a", File.ReadAllText(Path.Combine(root, "Haftalık Proje Toplantısı.ozet.md")));
-            Assert.Equal("second.m4a", File.ReadAllText(Path.Combine(root, "Haftalık Proje Toplantısı_2.ozet.md")));
+            Assert.Equal("first.m4a", File.ReadAllText(Path.Combine(root, Dated("Haftalık Proje Toplantısı.ozet.md"))));
+            Assert.Equal("second.m4a", File.ReadAllText(Path.Combine(root, Dated("Haftalık Proje Toplantısı_2.ozet.md"))));
         }
         finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
     }
@@ -221,8 +221,8 @@ public class PostProcessingTests
             var processor = new RecordingPostProcessor(http, (_, _) => throw new Exception("Existing transcript must be reused"));
             await processor.ProcessAsync("record.m4a", settings, _ => { });
             Assert.Equal(1, calls);
-            Assert.Equal("Önceki konuşma", await File.ReadAllTextAsync(Path.Combine(root, "record.md")));
-            Assert.Equal(markdown, await File.ReadAllTextAsync(Path.Combine(root, "Proje Devam Kararları.ozet.md")));
+            Assert.Equal("Önceki konuşma", await File.ReadAllTextAsync(Path.Combine(root, Dated("record.md"))));
+            Assert.Equal(markdown, await File.ReadAllTextAsync(Path.Combine(root, Dated("Proje Devam Kararları.ozet.md"))));
         }
         finally { Directory.Delete(root, true); }
     }
@@ -283,9 +283,9 @@ public class PostProcessingTests
         {
             var processor = new RecordingPostProcessor(http, (_, _) => { stt++; return Task.FromResult("Konuşma metni"); });
             await processor.ProcessAsync(name + ".m4a", settings, _ => { }, useRecordingName: useRecordingName);
-            string expected = Path.Combine(root, (useRecordingName ? name : "Otomatik Toplantı Adı") + ".ozet.md");
+            string expected = Path.Combine(root, Dated((useRecordingName ? name : "Otomatik Toplantı Adı") + ".ozet.md"));
             Assert.Equal(summary, await File.ReadAllTextAsync(expected));
-            Assert.Equal("Konuşma metni", await File.ReadAllTextAsync(Path.Combine(root, name + ".md")));
+            Assert.Equal("Konuşma metni", await File.ReadAllTextAsync(Path.Combine(root, Dated(name + ".md"))));
             var restarted = new RecordingPostProcessor(http, (_, _) => throw new Exception("Completed STT must not repeat"));
             await restarted.ProcessAsync(name + ".m4a", settings, _ => { }, useRecordingName: useRecordingName);
             Assert.Equal(1, stt); Assert.Equal(expectedRequests, requests);
@@ -313,7 +313,7 @@ public class PostProcessingTests
             await Assert.ThrowsAsync<HttpRequestException>(() => first.ProcessAsync("Benim Toplantım.m4a", settings, _ => { }, useRecordingName: true));
             var restarted = new RecordingPostProcessor(http, (_, _) => throw new Exception("STT must not repeat"));
             await restarted.ProcessAsync("Benim Toplantım.m4a", settings, _ => { }, useRecordingName: true);
-            Assert.Equal("Korunan özet", await File.ReadAllTextAsync(Path.Combine(root, "Benim Toplantım.ozet.md")));
+            Assert.Equal("Korunan özet", await File.ReadAllTextAsync(Path.Combine(root, Dated("Benim Toplantım.ozet.md"))));
             Assert.Equal(2, requests);
         }
         finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
@@ -326,17 +326,19 @@ public class PostProcessingTests
         Directory.CreateDirectory(root);
         try
         {
-            string existing = Path.Combine(root, "Benim Toplantım.ozet.md");
+            string existing = Path.Combine(root, Dated("Benim Toplantım.ozet.md"));
             await File.WriteAllTextAsync(existing, "Başka kaydın özeti");
             using var http = new HttpClient(new Handler(_ => Task.FromResult(Reply("Yeni kaydın özeti"))));
             var processor = new RecordingPostProcessor(http, (_, _) => Task.FromResult("Yeni metin"));
             var settings = new PostProcessingSettings { TranscriptFolder = root, SummaryFolder = root, LlmUrl = "http://localhost", LlmModel = "qwen" };
             await processor.ProcessAsync("Benim Toplantım.m4a", settings, _ => { }, useRecordingName: true);
             Assert.Equal("Başka kaydın özeti", await File.ReadAllTextAsync(existing));
-            Assert.Equal("Yeni kaydın özeti", await File.ReadAllTextAsync(Path.Combine(root, "Benim Toplantım_2.ozet.md")));
+            Assert.Equal("Yeni kaydın özeti", await File.ReadAllTextAsync(Path.Combine(root, Dated("Benim Toplantım_2.ozet.md"))));
         }
         finally { Directory.Delete(root, true); }
     }
+
+    private static string Dated(string name) => RecordingDates.WithPrefix(name, DateOnly.FromDateTime(DateTime.Now));
 
     private static HttpResponseMessage Reply(string content) => new(HttpStatusCode.OK)
     {

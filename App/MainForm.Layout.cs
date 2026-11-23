@@ -105,7 +105,7 @@ public sealed partial class MainForm
         naming.Controls.Add(LabelText("Kayıt adı (isteğe bağlı)", 9), 0, 0);
         var nameField = new StudioTextField(recordingName) { Dock = DockStyle.Fill, Margin = new Padding(0, 0, 0, 8) };
         naming.Controls.Add(nameField, 1, 0); recordingGrid.Controls.Add(naming, 0, 0);
-        hints.SetToolTip(recordingName, "Kayıt başlamadan veya kayıt sırasında yazabilirsiniz. Doluysa ses, metin ve özet bu adı kullanır; LLM'den ad istenmez. Boşsa özet adı LLM ile belirlenir. STT ve özetleme devam eder.");
+        hints.SetToolTip(recordingName, "Kayıt başlamadan veya kayıt sırasında yazabilirsiniz. Kayıt tarihi ggAAYY_ biçiminde otomatik eklenir. Doluysa ses, metin ve özet bu adı kullanır; LLM'den ad istenmez. Boşsa özet adı LLM ile belirlenir. STT ve özetleme devam eder.");
         var transport = Grid(5, 1);
         transport.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         transport.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));

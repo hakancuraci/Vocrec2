@@ -24,7 +24,9 @@ public static class RecordingFileNames
 
     public static string RenameCompleted(string audio, string requestedName, PostProcessingSettings settings)
     {
-        string title = Normalize(requestedName) ?? throw new ArgumentException("Kayıt adı boş olamaz.");
+        DateOnly recordedOn = RecordingDates.FromAudio(audio);
+        string title = Normalize(RecordingDates.WithoutPrefix(requestedName.Trim(), recordedOn)) ?? throw new ArgumentException("Kayıt adı boş olamaz.");
+        title = RecordingDates.WithPrefix(title, recordedOn);
         string original = Path.GetFullPath(audio);
         string folder = Path.GetDirectoryName(original)!;
         string[] outputFolders = [folder, settings.TranscriptFolder, settings.SummaryFolder];

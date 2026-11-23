@@ -30,7 +30,8 @@ public sealed class RecordingSession : IRecordingSession
         Automatic = automatic;
         this.enhanceMicrophone = enhanceMicrophone;
         Directory.CreateDirectory(folder);
-        string name = $"Kayit_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}_{Guid.NewGuid().ToString("N")[..6]}";
+        var startedAt = DateTime.Now;
+        string name = RecordingDates.WithPrefix($"Kayit_{startedAt:HH-mm-ss}_{Guid.NewGuid().ToString("N")[..6]}", DateOnly.FromDateTime(startedAt));
         OutputPath = Path.Combine(folder, name + ".m4a");
         PartialPath = Path.Combine(folder, name + ".partial.m4a");
         try

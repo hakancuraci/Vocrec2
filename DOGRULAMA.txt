@@ -45,3 +45,8 @@ Vocrec2 doğrulama
   ortak adı kullanır; doluysa LLM dosya adı çağrısı atlanır. Boşsa mevcut
   otomatik adlandırma sürer. Bekleyen işlerde adlandırma tercihi korunur.
   Ad temizleme, dosya çakışmaları ve kayıt sırasında değiştirme testleri eklendi.
+
+- Yeni ses/STT/özet dosyalarında ggAAYY_ tarih ön eki kullanılır. Tarih
+  kaydın başladığı gün alınır; elle/LLM adlandırmasında, eski tarihli
+  kayıtların yeniden işlenmesinde ve bekleyen işlerde korunur.
+  Yinelenen ön ek, uzun elle ad, eski otomatik ad ve çakışma testleri eklendi.

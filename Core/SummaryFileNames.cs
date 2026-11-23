@@ -17,9 +17,11 @@ public static class SummaryFileNames
         return title;
     }
 
-    public static async Task<string> WriteUniqueAsync(string folder, string title, string summary, CancellationToken token, bool preserveRecordingName = false)
+    public static async Task<string> WriteUniqueAsync(string folder, string title, string summary, CancellationToken token, bool preserveRecordingName = false, DateOnly? recordedOn = null)
     {
+        if (recordedOn is { } date) title = RecordingDates.WithoutPrefix(title, date);
         title = preserveRecordingName ? RecordingFileNames.Normalize(title) ?? "Kayıt" : Normalize(title);
+        if (recordedOn is { } day) title = RecordingDates.WithPrefix(title, day);
         for (int index = 1; index <= 10000; index++)
         {
             string path = Path.Combine(folder, title + (index == 1 ? "" : "_" + index) + ".ozet.md");
