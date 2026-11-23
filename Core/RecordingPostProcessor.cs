@@ -12,7 +12,7 @@ public sealed class RecordingPostProcessor(HttpClient http, Func<string, Cancell
     private const string TitlePrompt = "Aşağıdaki özeti temsil eden en fazla 5 kelimelik Türkçe bir dosya adı üret. Yalnızca dosya adını yaz. Açıklama, uzantı, tırnak veya Markdown ekleme.";
     private sealed record SummaryState(string Summary, string? Title = null, string? OutputPath = null);
 
-    public async Task ProcessAsync(string audio, PostProcessingSettings settings, Action<string> progress, CancellationToken token = default)
+    public async Task ProcessAsync(string audio, PostProcessingSettings settings, Action<string> progress, CancellationToken token = default, bool useRecordingName = false)
     {
         await gate.WaitAsync(token);
         try
@@ -55,10 +55,21 @@ public sealed class RecordingPostProcessor(HttpClient http, Func<string, Cancell
             if (state == null)
             {
                 progress("LLM özeti hazırlanıyor · " + name);
-                string? cachedSummary = File.Exists(fallback) ? fallback : File.Exists(legacyFallback) ? legacyFallback : null;
+                // A manually chosen name can also be returned by another recording's LLM.
+                // Its existing summary is not our cache; only our checkpoint owns a draft.
+                string? cachedSummary = useRecordingName ? null : File.Exists(fallback) ? fallback : File.Exists(legacyFallback) ? legacyFallback : null;
                 string summary = cachedSummary != null ? await File.ReadAllTextAsync(cachedSummary, token) : await CallLlmAsync(settings, settings.LlmPrompt, text, token);
                 state = new SummaryState(summary);
                 await WriteAtomicAsync(statePath, JsonSerializer.Serialize(state), token);
+            }
+            if (useRecordingName)
+            {
+                // The recording already owns this name. Keep audio, transcript and summary paired
+                // and never send the summary back to the model merely to obtain another title.
+                string namedOutput = await SummaryFileNames.WriteUniqueAsync(settings.SummaryFolder, name, state.Summary, token, preserveRecordingName: true);
+                state = state with { Title = name, OutputPath = namedOutput };
+                await WriteAtomicAsync(statePath, JsonSerializer.Serialize(state), token);
+                progress("Özet kaydedildi: " + namedOutput); return;
             }
             // Preserve the summary before asking the model for its filename.
             await WriteAtomicAsync(fallback, state.Summary, token);

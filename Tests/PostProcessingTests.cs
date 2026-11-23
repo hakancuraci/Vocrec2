@@ -253,6 +253,91 @@ public class PostProcessingTests
         finally { Directory.Delete(root, true); }
     }
 
+    [Theory]
+    [InlineData(true, 1)]
+    [InlineData(false, 2)]
+    public async Task ManualRecordingNameSkipsOnlyTheTitleRequestAndKeepsMarkdown(bool useRecordingName, int expectedRequests)
+    {
+        string root = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        const string name = "Bir iki üç dört beş altı yedi";
+        const string summary = "# Özet\n\n- Karar: devam et.\n";
+        var settings = new PostProcessingSettings { TranscriptFolder = root, SummaryFolder = root, LlmUrl = "http://localhost", LlmModel = "qwen", LlmPrompt = "Özetle" };
+        int requests = 0, stt = 0;
+        using var handler = new Handler(async request =>
+        {
+            requests++;
+            using var payload = JsonDocument.Parse(await request.Content!.ReadAsStringAsync());
+            var messages = payload.RootElement.GetProperty("messages");
+            if (requests == 1)
+            {
+                Assert.Equal("Özetle", messages[1].GetProperty("content").GetString());
+                Assert.Equal("Konuşma metni", messages[2].GetProperty("content").GetString());
+                return Reply(summary);
+            }
+            Assert.False(useRecordingName, "A user-named recording must never request an LLM filename.");
+            Assert.Equal(summary, messages[2].GetProperty("content").GetString());
+            return Reply("Otomatik Toplantı Adı");
+        });
+        using var http = new HttpClient(handler);
+        try
+        {
+            var processor = new RecordingPostProcessor(http, (_, _) => { stt++; return Task.FromResult("Konuşma metni"); });
+            await processor.ProcessAsync(name + ".m4a", settings, _ => { }, useRecordingName: useRecordingName);
+            string expected = Path.Combine(root, (useRecordingName ? name : "Otomatik Toplantı Adı") + ".ozet.md");
+            Assert.Equal(summary, await File.ReadAllTextAsync(expected));
+            Assert.Equal("Konuşma metni", await File.ReadAllTextAsync(Path.Combine(root, name + ".md")));
+            var restarted = new RecordingPostProcessor(http, (_, _) => throw new Exception("Completed STT must not repeat"));
+            await restarted.ProcessAsync(name + ".m4a", settings, _ => { }, useRecordingName: useRecordingName);
+            Assert.Equal(1, stt); Assert.Equal(expectedRequests, requests);
+            Assert.Single(Directory.GetFiles(root, "*.ozet.md"));
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
+    [Fact]
+    public async Task ManualNameSurvivesSummaryServiceFailureAndRestart()
+    {
+        string root = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        var settings = new PostProcessingSettings { TranscriptFolder = root, SummaryFolder = root, LlmUrl = "http://localhost", LlmModel = "qwen", LlmPrompt = "Özetle" };
+        int requests = 0;
+        using var handler = new Handler(async request =>
+        {
+            using var payload = JsonDocument.Parse(await request.Content!.ReadAsStringAsync());
+            Assert.Equal("Özetle", payload.RootElement.GetProperty("messages")[1].GetProperty("content").GetString());
+            return ++requests == 1 ? new HttpResponseMessage(HttpStatusCode.ServiceUnavailable) : Reply("Korunan özet");
+        });
+        using var http = new HttpClient(handler);
+        try
+        {
+            var first = new RecordingPostProcessor(http, (_, _) => Task.FromResult("metin"));
+            await Assert.ThrowsAsync<HttpRequestException>(() => first.ProcessAsync("Benim Toplantım.m4a", settings, _ => { }, useRecordingName: true));
+            var restarted = new RecordingPostProcessor(http, (_, _) => throw new Exception("STT must not repeat"));
+            await restarted.ProcessAsync("Benim Toplantım.m4a", settings, _ => { }, useRecordingName: true);
+            Assert.Equal("Korunan özet", await File.ReadAllTextAsync(Path.Combine(root, "Benim Toplantım.ozet.md")));
+            Assert.Equal(2, requests);
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
+    [Fact]
+    public async Task AConcurrentSummaryWithTheSameManualNameIsNeverReusedOrOverwritten()
+    {
+        string root = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            string existing = Path.Combine(root, "Benim Toplantım.ozet.md");
+            await File.WriteAllTextAsync(existing, "Başka kaydın özeti");
+            using var http = new HttpClient(new Handler(_ => Task.FromResult(Reply("Yeni kaydın özeti"))));
+            var processor = new RecordingPostProcessor(http, (_, _) => Task.FromResult("Yeni metin"));
+            var settings = new PostProcessingSettings { TranscriptFolder = root, SummaryFolder = root, LlmUrl = "http://localhost", LlmModel = "qwen" };
+            await processor.ProcessAsync("Benim Toplantım.m4a", settings, _ => { }, useRecordingName: true);
+            Assert.Equal("Başka kaydın özeti", await File.ReadAllTextAsync(existing));
+            Assert.Equal("Yeni kaydın özeti", await File.ReadAllTextAsync(Path.Combine(root, "Benim Toplantım_2.ozet.md")));
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
     private static HttpResponseMessage Reply(string content) => new(HttpStatusCode.OK)
     {
         Content = new StringContent(JsonSerializer.Serialize(new { choices = new[] { new { message = new { content } } } }), Encoding.UTF8, "application/json")

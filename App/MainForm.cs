@@ -18,8 +18,10 @@ public sealed partial class MainForm : Form
     private readonly Func<Task<ObservedDevice[]>> readDevices;
     private readonly Func<Task<ActivitySnapshot>> readActivity;
     private readonly Func<RecordingRequest, IRecordingSession> createRecording;
+    private readonly Func<string, PostProcessingSettings, Action<string>, bool, Task> processRecording;
     private readonly DevicePicker outputs = new(), microphones = new();
     private readonly TextBox folder = new() { Dock = DockStyle.Fill, ReadOnly = true, BorderStyle = BorderStyle.None, BackColor = StudioTheme.Field, ForeColor = StudioTheme.Ink };
+    private readonly TextBox recordingName = new() { AccessibleName = "Kayıt adı", MaxLength = 120, PlaceholderText = "Örn. Haftalık proje toplantısı" };
     private readonly StudioChoice quality = new() { Dock = DockStyle.Fill };
     private readonly VolumeSlider systemGain = new(), micGain = new();
     private readonly LevelMeter systemMeter = new(), micMeter = new();
@@ -43,11 +45,13 @@ public sealed partial class MainForm : Form
     { }
 
     internal MainForm(Func<Task<ObservedDevice[]>> readDevices, Func<Task<ActivitySnapshot>> readActivity,
-        Func<RecordingRequest, IRecordingSession> createRecording, string? settingsFile = null)
+        Func<RecordingRequest, IRecordingSession> createRecording, string? settingsFile = null,
+        Func<string, PostProcessingSettings, Action<string>, bool, Task>? processRecording = null)
     {
         this.readDevices = readDevices;
         this.readActivity = readActivity;
         this.createRecording = createRecording;
+        this.processRecording = processRecording ?? ProcessRecordingAsync;
         if (settingsFile != null) settingsPath = settingsFile;
         Text = $"Vocrec2 v{AppVersion.Number} · Ses kayıt stüdyosu";
         var windowIcon = (Icon)AppLogo.Icon.Clone(); Icon = windowIcon;
@@ -120,7 +124,7 @@ public sealed partial class MainForm : Form
         string path;
         try { if (string.IsNullOrWhiteSpace(folder.Text)) throw new IOException("Kayıt klasörünü seçin."); path = Path.GetFullPath(folder.Text); }
         catch (Exception ex) { ShowError(ex); return; }
-        busy = true; SetRecording(true); stop.Enabled = false; recordState.Text = "● HAZIRLANIYOR"; status.Text = "Ses kaynakları açılıyor…";
+        busy = true; recordingName.Enabled = false; SetRecording(true); stop.Enabled = false; recordState.Text = "● HAZIRLANIYOR"; status.Text = "Ses kaynakları açılıyor…";
         int bitrate = Bitrate(); float sg = systemGain.Value / 100f, mg = micGain.Value / 100f; bool auto = automatic.Checked;
         try
         {
@@ -135,13 +139,14 @@ public sealed partial class MainForm : Form
             lastFile = null; elapsed.Text = "00:00:00"; status.Text = "● Kayıt yapılıyor"; recordState.Text = "● KAYITTA"; timer.Start(); stop.Enabled = true;
         }
         catch (Exception ex) { SetRecording(false); status.Text = "Kayıt başlatılamadı."; ShowError(ex); }
-        finally { busy = false; }
+        finally { busy = false; recordingName.Enabled = true; }
     }
 
     internal async Task StopAsync()
     {
         if (busy || session is null) return;
-        busy = true; timer.Stop(); stop.Enabled = false; status.Text = "Dosya tamamlanıyor…";
+        string? chosenName = RecordingFileNames.Normalize(recordingName.Text);
+        busy = true; recordingName.Enabled = false; timer.Stop(); stop.Enabled = false; status.Text = "Dosya tamamlanıyor…";
         var current = session;
         try { await current.StopAsync(); lastFile = current.OutputPath; status.Text = "Kaydedildi: " + Path.GetFileName(lastFile); }
         catch (Exception ex)
@@ -150,8 +155,22 @@ public sealed partial class MainForm : Form
             status.Text = "Kayıt hatayla durdu.";
             ShowError(new IOException(ex.Message + (lastFile is null ? $"\nKısmi dosya (tamamlanmamış olabilir):\n{current.PartialPath}" : ""), ex));
         }
-        finally { DisplayDuration(current.Mixer.Duration); current.Dispose(); session = null; busy = false; SetRecording(false); systemMeter.Value = micMeter.Value = 0; SaveSettings(); }
-        if (lastFile != null && File.Exists(lastFile)) QueueProcessing(lastFile, settings.Processing);
+        finally { DisplayDuration(current.Mixer.Duration); current.Dispose(); session = null; busy = false; recordingName.Enabled = true; SetRecording(false); systemMeter.Value = micMeter.Value = 0; SaveSettings(); }
+        if (lastFile != null && File.Exists(lastFile))
+        {
+            if (chosenName != null)
+            {
+                try
+                {
+                    lastFile = RecordingFileNames.RenameCompleted(lastFile, chosenName, settings.Processing);
+                    status.Text = "Kaydedildi: " + Path.GetFileName(lastFile);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+                { ShowError(new IOException("Kayıt adı değiştirilemedi; ses özgün adıyla korundu: " + lastFile, ex)); }
+            }
+            QueueProcessing(lastFile, settings.Processing, useRecordingName: chosenName != null);
+            recordingName.Clear();
+        }
     }
 
     private Task<ObservedDevice[]> ReadDevicesAsync(bool refresh = false)

@@ -18,6 +18,7 @@ public sealed partial class MainForm
         recordingTab.AccessibleDescription = processing ? "Kayıt sekmesini aç" : "Seçili sekme";
         processingTab.AccessibleDescription = processing ? "Seçili sekme" : "STT ve LLM ayarlarını aç";
         recordingTab.Invalidate(); processingTab.Invalidate();
+        updateTextLayout?.Invoke();
     }
 
     private void BuildLayout()
@@ -27,7 +28,7 @@ public sealed partial class MainForm
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 72));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 56));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 108));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 156));
         Controls.Add(root);
         AddWindowChrome(); root.BringToFront();
 
@@ -96,8 +97,15 @@ public sealed partial class MainForm
         SelectWorkspace(false);
 
         var recording = new StudioCard { Dock = DockStyle.Fill, Margin = new Padding(0, 8, 0, 0), Padding = new Padding(16, 10, 16, 8) };
-        var recordingGrid = Grid(1, 2);
+        var recordingGrid = Grid(1, 3);
+        recordingGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
         recordingGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); recordingGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, 22));
+        var naming = Grid(2, 1);
+        naming.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 185)); naming.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        naming.Controls.Add(LabelText("Kayıt adı (isteğe bağlı)", 9), 0, 0);
+        var nameField = new StudioTextField(recordingName) { Dock = DockStyle.Fill, Margin = new Padding(0, 0, 0, 8) };
+        naming.Controls.Add(nameField, 1, 0); recordingGrid.Controls.Add(naming, 0, 0);
+        hints.SetToolTip(recordingName, "Kayıt başlamadan veya kayıt sırasında yazabilirsiniz. Doluysa ses, metin ve özet bu adı kullanır; LLM'den ad istenmez. Boşsa özet adı LLM ile belirlenir. STT ve özetleme devam eder.");
         var transport = Grid(5, 1);
         transport.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         transport.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
@@ -112,7 +120,7 @@ public sealed partial class MainForm
         refresh.Font = new Font("Segoe UI", 9); refresh.Margin = new Padding(0, 5, 8, 5); transport.Controls.Add(refresh, 2, 0);
         stop.Margin = new Padding(0, 5, 8, 5); stop.Enabled = false; transport.Controls.Add(stop, 3, 0);
         start.Primary = true; start.Margin = new Padding(0, 5, 0, 5); transport.Controls.Add(start, 4, 0);
-        recordingGrid.Controls.Add(transport, 0, 0); status.Font = new Font("Segoe UI", 9); recordingGrid.Controls.Add(status, 0, 1);
+        recordingGrid.Controls.Add(transport, 0, 1); status.Font = new Font("Segoe UI", 9); recordingGrid.Controls.Add(status, 0, 2);
         recording.Controls.Add(recordingGrid); root.Controls.Add(recording, 0, 3);
         hints.SetToolTip(browse, "Yeni kayıtların kaydedileceği klasörü seçer.");
         hints.SetToolTip(open, "Seçili kayıt klasörünü Dosya Gezgini’nde açar. Kayıt konumunu değiştirmez.");
@@ -129,7 +137,10 @@ public sealed partial class MainForm
                 int headerHeight = Math.Max(72, tagline.Bottom + 9);
                 if (root.RowStyles[0].Height != headerHeight) root.RowStyles[0].Height = headerHeight;
                 mark.Top = Math.Max(5, (headerHeight - mark.Height) / 2);
-                int footerHeight = Math.Max(108, elapsed.PreferredHeight + status.PreferredHeight + recording.Padding.Vertical + recording.Margin.Vertical + 10);
+                bool showName = recordingTab.Selected;
+                naming.Visible = showName;
+                recordingGrid.RowStyles[0].Height = showName ? 48 : 0;
+                int footerHeight = Math.Max(showName ? 156 : 108, elapsed.PreferredHeight + status.PreferredHeight + recording.Padding.Vertical + recording.Margin.Vertical + 10 + (showName ? 48 : 0));
                 if (root.RowStyles[3].Height != footerHeight) root.RowStyles[3].Height = footerHeight;
             }
             finally { updating = false; }

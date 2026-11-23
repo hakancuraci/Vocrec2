@@ -40,3 +40,8 @@ Vocrec2 doğrulama
   Windows panosundan çok satırlı/tek satırlı uzun metin yapıştırma,
   temizleme, yeniden yapıştırma ve kapanış sonrası geri yükleme testleri
   eklendi. Düzenleme sırasında native metin kutusu yeniden oluşturulmaz.
+
+- İsteğe bağlı kayıt adı kayıt sırasında düzenlenebilir. Ses, metin ve özet
+  ortak adı kullanır; doluysa LLM dosya adı çağrısı atlanır. Boşsa mevcut
+  otomatik adlandırma sürer. Bekleyen işlerde adlandırma tercihi korunur.
+  Ad temizleme, dosya çakışmaları ve kayıt sırasında değiştirme testleri eklendi.

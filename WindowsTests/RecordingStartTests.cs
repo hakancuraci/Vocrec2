@@ -406,6 +406,70 @@ public class RecordingStartTests
         return Task.CompletedTask;
     });
 
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public Task RecordingNameCanBeEditedDuringCaptureAndPersistsWithPendingJobs(bool enterDuringRecording, bool clearDuringRecording) => OnUiThread(async () =>
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "vocrec-record-name-" + Guid.NewGuid().ToString("N"));
+        string settingsFile = Path.Combine(directory, "settings.json");
+        Directory.CreateDirectory(directory);
+        var options = new PostProcessingSettings { TranscriptFolder = Path.Combine(directory, "text"), SummaryFolder = Path.Combine(directory, "summary") };
+        File.WriteAllText(settingsFile, System.Text.Json.JsonSerializer.Serialize(new { Folder = directory, Processing = options }));
+        const string title = "Haftalık Proje Toplantısı";
+        FakeSession? recording = null;
+        bool named = !clearDuringRecording;
+        string? processedFile = null;
+        try
+        {
+            // Existing content must survive; a new recording uses the next available name.
+            File.WriteAllText(Path.Combine(directory, title + ".m4a"), "previous audio");
+            using (var form = new MainForm(() => Task.FromResult(Devices), () => Task.FromResult(EmptyActivity),
+                request => recording = new FakeSession(request), settingsFile,
+                (file, _, _, useName) =>
+                {
+                    processedFile = file; Assert.Equal(named, useName);
+                    return Task.FromException(new IOException("Simulated unavailable STT; leave the job pending."));
+                }))
+            {
+                form.ShowInTaskbar = false; form.Show(); form.Size = form.MinimumSize;
+                var input = Assert.IsType<TextBox>(Descendants(form).Single(c => c.AccessibleName == "Kayıt adı"));
+                Assert.True(input.Visible);
+                Assert.True(form.ClientRectangle.Contains(form.RectangleToClient(input.RectangleToScreen(input.ClientRectangle))));
+                if (!enterDuringRecording) input.Text = title;
+                await form.StartAsync(); Assert.True(input.Enabled);
+                if (enterDuringRecording) input.Text = title;
+                if (clearDuringRecording) input.Text = "   ";
+                File.WriteAllText(recording!.OutputPath, "new audio");
+                await form.StopAsync(); await form.ProcessingCompletion.WaitAsync(TimeSpan.FromSeconds(5));
+                Assert.Equal("", input.Text); Assert.True(input.Enabled);
+                Assert.Equal(named ? title + "_2.m4a" : "test.m4a", Path.GetFileName(processedFile));
+                Assert.Equal("new audio", File.ReadAllText(processedFile!));
+                Assert.Equal("previous audio", File.ReadAllText(Path.Combine(directory, title + ".m4a")));
+                using var pending = System.Text.Json.JsonDocument.Parse(File.ReadAllText(Assert.Single(Directory.GetFiles(Path.Combine(directory, "pending"), "*.json"))));
+                Assert.Equal(named, pending.RootElement.GetProperty("UseRecordingName").GetBoolean());
+                Assert.Equal(processedFile, pending.RootElement.GetProperty("Audio").GetString());
+                form.Close();
+            }
+            var resumed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var restored = new MainForm(() => Task.FromResult(Devices), () => Task.FromResult(EmptyActivity),
+                request => new FakeSession(request), settingsFile,
+                (file, _, _, useName) =>
+                {
+                    Assert.Equal(named, useName); Assert.Equal(processedFile, file);
+                    resumed.SetResult(); return Task.CompletedTask;
+                });
+            restored.ShowInTaskbar = false; restored.Show();
+            await resumed.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await restored.ProcessingCompletion.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.Empty(Directory.GetFiles(Path.Combine(directory, "pending"), "*.json"));
+            Assert.Equal("", Descendants(restored).Single(c => c.AccessibleName == "Kayıt adı").Text);
+            restored.Close();
+        }
+        finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
+    });
+
     private static IEnumerable<Control> Descendants(Control parent)
     {
         foreach (Control child in parent.Controls)

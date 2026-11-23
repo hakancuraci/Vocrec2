@@ -14,8 +14,9 @@ public sealed partial class MainForm
     private readonly StudioButton saveProcessing = MakeButton("Ayarları kaydet");
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte> queued = new();
     private string PendingDirectory => Path.Combine(Path.GetDirectoryName(settingsPath)!, "pending");
-    private sealed record PendingJob(string Audio, PostProcessingSettings Settings);
+    private sealed record PendingJob(string Audio, PostProcessingSettings Settings, bool UseRecordingName = false);
     private Task processingTask = Task.CompletedTask;
+    internal Task ProcessingCompletion => processingTask;
 
     private Control ProcessingCard()
     {
@@ -293,14 +294,14 @@ public sealed partial class MainForm
             try
             {
                 var job = System.Text.Json.JsonSerializer.Deserialize<PendingJob>(File.ReadAllText(path));
-                if (job != null && File.Exists(job.Audio)) QueueProcessing(job.Audio, useCurrentSettings ? settings.Processing : job.Settings);
+                if (job != null && File.Exists(job.Audio)) QueueProcessing(job.Audio, useCurrentSettings ? settings.Processing : job.Settings, job.UseRecordingName);
             }
             catch (Exception ex) when (ex is IOException or System.Text.Json.JsonException or UnauthorizedAccessException)
             { status.Text = "Bekleyen işlem okunamadı: " + ex.Message; }
         }
     }
 
-    private void QueueProcessing(string file, PostProcessingSettings value)
+    private void QueueProcessing(string file, PostProcessingSettings value, bool useRecordingName = false)
     {
         if (!queued.TryAdd(file, 0)) return;
         string id = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(Path.GetFullPath(file))));
@@ -308,7 +309,7 @@ public sealed partial class MainForm
         try
         {
             Directory.CreateDirectory(PendingDirectory);
-            File.WriteAllText(pending + ".tmp", System.Text.Json.JsonSerializer.Serialize(new PendingJob(file, value)));
+            File.WriteAllText(pending + ".tmp", System.Text.Json.JsonSerializer.Serialize(new PendingJob(file, value, useRecordingName)));
             File.Move(pending + ".tmp", pending, true);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -326,11 +327,7 @@ public sealed partial class MainForm
             }
             try
             {
-                using var runtime = new PortableRuntime();
-                using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(15) };
-                var processor = new RecordingPostProcessor(http, (audio, token) => runtime.TranscribeAsync(audio, cancellationToken: token),
-                    saved => LlmTokenProtection.Unprotect(saved.ProtectedLlmBearerToken));
-                await processor.ProcessAsync(file, value, Report);
+                await processRecording(file, value, Report, useRecordingName);
                 if (File.Exists(pending)) File.Delete(pending);
             }
             catch (Exception ex)
@@ -346,5 +343,14 @@ public sealed partial class MainForm
             }
             finally { queued.TryRemove(file, out _); }
         });
+    }
+
+    private static async Task ProcessRecordingAsync(string file, PostProcessingSettings value, Action<string> report, bool useRecordingName)
+    {
+        using var runtime = new PortableRuntime();
+        using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(15) };
+        var processor = new RecordingPostProcessor(http, (audio, token) => runtime.TranscribeAsync(audio, cancellationToken: token),
+            saved => LlmTokenProtection.Unprotect(saved.ProtectedLlmBearerToken));
+        await processor.ProcessAsync(file, value, report, useRecordingName: useRecordingName);
     }
 }

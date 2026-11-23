@@ -109,6 +109,10 @@ internal static class Program
         var folder = controls.Single(c => c.AccessibleName == "Seçili kayıt klasörü");
         if (!folder.Visible || !form.ClientRectangle.Contains(form.RectangleToClient(folder.RectangleToScreen(folder.ClientRectangle))))
             throw new InvalidOperationException("Recording folder must stay visible without scrolling.");
+        var recordingName = controls.Single(c => c.AccessibleName == "Kayıt adı");
+        if (!recordingName.Visible || recordingName.Height < recordingName.PreferredSize.Height)
+            throw new InvalidOperationException("Optional recording name must remain visible and readable.");
+        CheckAncestorClipping(recordingName);
         foreach (var name in new[] { "Kayıt süresi", "Uygulama başlığı", "Uygulama açıklaması" })
         {
             var label = (Label)controls.Single(c => c.AccessibleName == name);

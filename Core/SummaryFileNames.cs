@@ -17,9 +17,9 @@ public static class SummaryFileNames
         return title;
     }
 
-    public static async Task<string> WriteUniqueAsync(string folder, string title, string summary, CancellationToken token)
+    public static async Task<string> WriteUniqueAsync(string folder, string title, string summary, CancellationToken token, bool preserveRecordingName = false)
     {
-        title = Normalize(title);
+        title = preserveRecordingName ? RecordingFileNames.Normalize(title) ?? "Kayıt" : Normalize(title);
         for (int index = 1; index <= 10000; index++)
         {
             string path = Path.Combine(folder, title + (index == 1 ? "" : "_" + index) + ".ozet.md");
