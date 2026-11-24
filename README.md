@@ -44,7 +44,7 @@ Değişiklik aynı `.m4a` kaydı içinde uygulanır; sayaç ve kodlayıcı yenid
 
 ## Günlük özet klasörleri
 
-LLM özetleri seçtiğiniz özet çıktı klasörü altında **`gg.AA.yyyy`** günlük klasörlerinde toplanır. Örnek: `Ozetler/24.11.2026/241126_Proje Toplantısı.ozet.md`. Aynı günün tüm özetleri aynı klasöre, ertesi günün kayıtları yeni klasöre yazılır. Bu kural elle ad verilen ve LLM ile adlandırılan özetlere uygulanır. Kullanılan tarih kaydın başladığı gündür; özet sonraki gün tamamlansa veya bekleyen iş yeniden denense de aynı klasörde kalır. Ses ve STT metni mevcut çıktı klasörlerini kullanmaya devam eder.
+LLM özetleri seçtiğiniz özet çıktı klasörü altında **`ggAAYY`** günlük klasörlerinde toplanır. Örnek: `Ozetler/241126/241126_Proje Toplantısı.ozet.md`. Aynı günün tüm özetleri aynı klasöre, ertesi günün kayıtları yeni klasöre yazılır. Bu kural elle ad verilen ve LLM ile adlandırılan özetlere uygulanır. Kullanılan tarih kaydın başladığı gündür; özet sonraki gün tamamlansa veya bekleyen iş yeniden denense de aynı klasörde kalır. Ses ve STT metni mevcut çıktı klasörlerini kullanmaya devam eder.
 
 Eski düz klasör sürümünden kalan bekleyen bir işin özeti zaten tamamlanmışsa, yeniden LLM çağrısı yapılmadan günlük klasöre kopyalanır ve işlem eşlemesi güncellenir; özgün dosya korunur.
 

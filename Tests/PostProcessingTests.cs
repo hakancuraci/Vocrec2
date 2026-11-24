@@ -352,8 +352,8 @@ public class PostProcessingTests
             foreach (string name in new[] { "241126_Birinci", "241126_İkinci", "251126_Üçüncü" })
                 await processor.ProcessAsync(name + ".m4a", settings, _ => { }, useRecordingName: true);
             Assert.Equal(2, Directory.GetDirectories(settings.SummaryFolder).Length);
-            Assert.Equal(2, Directory.GetFiles(Path.Combine(settings.SummaryFolder, "24.11.2026"), "*.ozet.md").Length);
-            Assert.Single(Directory.GetFiles(Path.Combine(settings.SummaryFolder, "25.11.2026"), "*.ozet.md"));
+            Assert.Equal(2, Directory.GetFiles(Path.Combine(settings.SummaryFolder, "241126"), "*.ozet.md").Length);
+            Assert.Single(Directory.GetFiles(Path.Combine(settings.SummaryFolder, "251126"), "*.ozet.md"));
             Assert.Empty(Directory.GetFiles(settings.SummaryFolder, "*.ozet.md"));
             // Model a completed job from the previous flat-folder version.
             string oldOutput = Path.Combine(settings.SummaryFolder, "231126_Eski Toplantı.ozet.md");
@@ -364,9 +364,9 @@ public class PostProcessingTests
             var resumed = new RecordingPostProcessor(http, (_, _) => throw new Exception("Do not repeat STT"));
             await resumed.ProcessAsync("231126_Eski.m4a", settings, _ => { });
             await resumed.ProcessAsync("231126_Eski.m4a", settings, _ => { });
-            Assert.Equal("Korunan eski özet", await File.ReadAllTextAsync(Path.Combine(settings.SummaryFolder, "23.11.2026", "231126_Eski Toplantı.ozet.md")));
+            Assert.Equal("Korunan eski özet", await File.ReadAllTextAsync(Path.Combine(settings.SummaryFolder, "231126", "231126_Eski Toplantı.ozet.md")));
             Assert.True(File.Exists(oldOutput)); Assert.Equal(3, requests);
-            Assert.Single(Directory.GetFiles(Path.Combine(settings.SummaryFolder, "23.11.2026"), "*.ozet.md"));
+            Assert.Single(Directory.GetFiles(Path.Combine(settings.SummaryFolder, "231126"), "*.ozet.md"));
         }
         finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
     }
