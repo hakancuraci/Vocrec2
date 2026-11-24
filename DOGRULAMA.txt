@@ -59,3 +59,9 @@ Vocrec2 doğrulama
 
 - Özet Markdown dosya adından tarih ön eki kaldırıldı; tarih yalnız
   günlük klasörde kalır. Ses ve STT metni adları kayıt tarihini korur.
+
+- İşlem geçmişi/arşiv penceresi: kuyruk sırası, canlı aşamalar, süreler,
+  olay zamanları, hata ve çıktılara erişim eklendi. FIFO tek işçi kuyruğu
+  otomatik kayıtları ve elle özetleri birlikte işler; hata sonrasında devam eder.
+- Çoklu MD/ses seçimi, bölüm sırası, ayrı/tek özet, güncel promptla yeni
+  çalışma, ses bazlı STT önbelleği ve yeniden açılışta devam testleri eklendi.

@@ -12,10 +12,9 @@ public sealed partial class MainForm
     private readonly StudioSwitch enhanceMic = new() { Text = "Mikrofon konuşma iyileştirme", AccessibleName = "Mikrofon konuşma iyileştirme", OffText = "Kapalı" };
     private readonly Label processingSaveState = LabelText("URL boşsa yalnızca metin oluşturulur.", 8);
     private readonly StudioButton saveProcessing = MakeButton("Ayarları kaydet");
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte> queued = new();
     private string PendingDirectory => Path.Combine(Path.GetDirectoryName(settingsPath)!, "pending");
     private sealed record PendingJob(string Audio, PostProcessingSettings Settings, bool UseRecordingName = false);
-    private Task processingTask = Task.CompletedTask;
+    private Task processingTask => processingQueue.Completion;
     internal Task ProcessingCompletion => processingTask;
 
     private Control ProcessingCard()
@@ -128,7 +127,7 @@ public sealed partial class MainForm
 
     private void InitializeProcessingControls()
     {
-        Shown += (_, _) => ResumePending(useCurrentSettings: false);
+        Shown += (_, _) => { processingQueue.ResumeInterrupted(); ResumePending(useCurrentSettings: false); historyTimer.Start(); RefreshProcessingIndicator(); };
         profilePicker.SelectedIndexChanged += (_, _) => SwitchLlmProfile();
         foreach (var field in new[] { transcriptFolder, summaryFolder, llmUrl, llmModel, llmPrompt, llmBearerToken, profileName })
             field.TextChanged += (_, _) => { processingSaveState.Text = "Değişiklikleri uygulamak için kaydedin."; processingSaveState.ForeColor = StudioTheme.Muted; };
@@ -289,7 +288,7 @@ public sealed partial class MainForm
     private void ResumePending(bool useCurrentSettings)
     {
         if (!Directory.Exists(PendingDirectory)) return;
-        foreach (var path in Directory.EnumerateFiles(PendingDirectory, "*.json"))
+        foreach (var path in Directory.EnumerateFiles(PendingDirectory, "*.json").OrderBy(File.GetLastWriteTimeUtc))
         {
             try
             {
@@ -303,54 +302,74 @@ public sealed partial class MainForm
 
     private void QueueProcessing(string file, PostProcessingSettings value, bool useRecordingName = false)
     {
-        if (!queued.TryAdd(file, 0)) return;
         string id = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(Path.GetFullPath(file))));
-        string pending = Path.Combine(PendingDirectory, id + ".json");
+        if (processingQueue.Snapshot().Any(j => j.Id == id && j.Status is ProcessingStatus.Queued or ProcessingStatus.Running or ProcessingStatus.Completed)) return;
         try
         {
             Directory.CreateDirectory(PendingDirectory);
+            string pending = Path.Combine(PendingDirectory, id + ".json");
             File.WriteAllText(pending + ".tmp", System.Text.Json.JsonSerializer.Serialize(new PendingJob(file, value, useRecordingName)));
             File.Move(pending + ".tmp", pending, true);
+            processingQueue.Enqueue(new ProcessingJob { Id = id, Sources = [file], Kind = ProcessingKind.Recording,
+                Settings = value, UseRecordingName = useRecordingName, Profile = profileName.Text, RecordedOn = RecordingDates.FromAudio(file) });
+            RefreshProcessingIndicator();
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        { status.Text = "İşlem kuyruğu kaydedilemedi: " + ex.Message; }
+        { status.Text = "İşlem kuyruğu kaydedilemedi; ses korundu: " + ex.Message; }
+    }
 
-        var previous = processingTask;
-        processingTask = Task.Run(async () =>
+    private async Task ExecuteJobAsync(ProcessingJob job, Action<string> progress)
+    {
+        void Report(string message)
         {
-            await previous;
-            void Report(string message)
+            progress(message);
+            if (IsDisposed || !IsHandleCreated) return;
+            try { BeginInvoke((Action)(() => { if (!IsDisposed && session == null) status.Text = message; })); }
+            catch (InvalidOperationException) { }
+        }
+        try
+        {
+            if (job.Kind == ProcessingKind.Recording)
             {
-                if (IsDisposed || !IsHandleCreated) return;
-                try { BeginInvoke((Action)(() => { if (!IsDisposed && session == null) status.Text = message; })); }
-                catch (InvalidOperationException) { }
-            }
-            try
-            {
-                await processRecording(file, value, Report, useRecordingName);
+                await processRecording(job.Sources[0], job.Settings, Report, job.UseRecordingName);
+                string pending = Path.Combine(PendingDirectory, job.Id + ".json");
                 if (File.Exists(pending)) File.Delete(pending);
             }
-            catch (Exception ex)
-            {
-                Report("Metin/özet hatası (ses korunuyor): " + ex.Message);
-                try
-                {
-                    var log = Path.Combine(Path.GetDirectoryName(settingsPath)!, "processing-errors.log");
-                    File.AppendAllText(log, $"{DateTimeOffset.Now:O} {file}\n{ex}\n");
-                }
-                catch (IOException) { }
-                catch (UnauthorizedAccessException) { }
-            }
-            finally { queued.TryRemove(file, out _); }
-        });
+            else await processManual(job, Report);
+        }
+        catch (Exception ex)
+        {
+            Report("Metin/özet hatası (kaynaklar korunuyor): " + ex.Message);
+            try { File.AppendAllText(Path.Combine(Path.GetDirectoryName(settingsPath)!, "processing-errors.log"), $"{DateTimeOffset.Now:O} {job.DisplayName}\n{ex}\n"); }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+            throw;
+        }
     }
 
     private static async Task ProcessRecordingAsync(string file, PostProcessingSettings value, Action<string> report, bool useRecordingName)
     {
-        using var runtime = new PortableRuntime();
+        PortableRuntime? runtime = null;
         using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(15) };
-        var processor = new RecordingPostProcessor(http, (audio, token) => runtime.TranscribeAsync(audio, cancellationToken: token),
-            saved => LlmTokenProtection.Unprotect(saved.ProtectedLlmBearerToken));
-        await processor.ProcessAsync(file, value, report, useRecordingName: useRecordingName);
+        try
+        {
+            var processor = new RecordingPostProcessor(http, (audio, token) => (runtime ??= new PortableRuntime()).TranscribeAsync(audio, cancellationToken: token),
+                saved => LlmTokenProtection.Unprotect(saved.ProtectedLlmBearerToken));
+            await processor.ProcessAsync(file, value, report, useRecordingName: useRecordingName);
+        }
+        finally { runtime?.Dispose(); }
+    }
+
+    private static async Task ProcessManualAsync(ProcessingJob job, Action<string> report)
+    {
+        PortableRuntime? runtime = null;
+        using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(15) };
+        try
+        {
+            var processor = new TranscriptBatchProcessor(http, (audio, token) => (runtime ??= new PortableRuntime()).TranscribeAsync(audio, cancellationToken: token),
+                saved => LlmTokenProtection.Unprotect(saved.ProtectedLlmBearerToken));
+            await processor.ProcessAsync(job, report);
+        }
+        finally { runtime?.Dispose(); }
     }
 }

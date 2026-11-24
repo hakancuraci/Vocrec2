@@ -50,6 +50,12 @@ internal static class Program
                 form.PerformLayout(); form.Refresh(); Application.DoEvents();
                 CheckProcessingControls(form);
                 Capture(form, "Vocrec2-STT-LLM-compact.png", path);
+                Descendants(form).OfType<Button>().Single(c => c.Name == "ProcessingHistory").PerformClick();
+                Application.DoEvents();
+                var history = Application.OpenForms.Cast<Form>().Single(f => f.AccessibleName == "İşlemler ve arşiv penceresi");
+                history.Size = history.MinimumSize; history.PerformLayout(); history.Refresh();
+                foreach (var button in Descendants(history).OfType<Button>().Where(c => c.Visible)) CheckAncestorClipping(button);
+                Capture(history, "Vocrec2-Islem-Gecmisi.png", path); history.Close();
                 result = 0;
             }
             catch (Exception ex) { Console.Error.WriteLine(ex); }
@@ -113,6 +119,7 @@ internal static class Program
         if (!recordingName.Visible || recordingName.Height < recordingName.PreferredSize.Height)
             throw new InvalidOperationException("Optional recording name must remain visible and readable.");
         CheckAncestorClipping(recordingName);
+        CheckAncestorClipping(controls.Single(c => c.Name == "ProcessingHistory"));
         foreach (var name in new[] { "Kayıt süresi", "Uygulama başlığı", "Uygulama açıklaması" })
         {
             var label = (Label)controls.Single(c => c.AccessibleName == name);

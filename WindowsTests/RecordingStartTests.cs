@@ -551,6 +551,99 @@ public class RecordingStartTests
         finally { nextScan.TrySetResult(Devices); if (Directory.Exists(directory)) Directory.Delete(directory, true); }
     });
 
+    [Fact]
+    public Task RapidRecordingsUseOneQueueWhileHistoryCanBeClosedAndReopenedDuringCapture() => OnUiThread(async () =>
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "vocrec-history-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(directory);
+        string settingsFile = Path.Combine(directory, "settings.json");
+        File.WriteAllText(settingsFile, System.Text.Json.JsonSerializer.Serialize(new { Folder = directory }));
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var order = new System.Collections.Concurrent.ConcurrentQueue<string>();
+        int number = 0, active = 0, maximum = 0; FakeSession? current = null;
+        using var form = new MainForm(() => Task.FromResult(Devices), () => Task.FromResult(EmptyActivity),
+            request => current = new FakeSession(request, $"part{++number}.m4a"), settingsFile,
+            async (file, _, report, _) =>
+            {
+                int count = Interlocked.Increment(ref active); maximum = Math.Max(maximum, count); order.Enqueue(Path.GetFileName(file));
+                try { report("STT başladı · " + file); if (file.Contains("part1", StringComparison.Ordinal)) { entered.TrySetResult(); await release.Task; } report("LLM özeti hazırlanıyor"); }
+                finally { Interlocked.Decrement(ref active); }
+            });
+        try
+        {
+            form.ShowInTaskbar = false; form.Show();
+            for (int i = 0; i < 3; i++)
+            {
+                await form.StartAsync(); File.WriteAllText(current!.OutputPath, "fake completed recording"); await form.StopAsync();
+            }
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await form.StartAsync();
+            Assert.Equal(2, form.ProcessingHistory.Count(j => j.Status == ProcessingStatus.Queued));
+            Assert.Equal(1, form.ProcessingHistory.Count(j => j.Status == ProcessingStatus.Running));
+            var popup = form.OpenProcessingHub(); Application.DoEvents();
+            Assert.NotNull(popup.Owner); Assert.True(popup.Visible);
+            var list = (ListView)Descendants(popup).Single(c => c.AccessibleName == "İşlem geçmişi");
+            Assert.Equal(3, list.Items.Count);
+            popup.Close();
+            var reopened = form.OpenProcessingHub(); Application.DoEvents(); Assert.NotSame(popup, reopened);
+            Assert.False(current!.Completion.IsCompleted);
+            File.WriteAllText(current.OutputPath, "fourth completed recording"); await form.StopAsync();
+            release.SetResult(); await form.ProcessingCompletion.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.Equal(1, maximum); Assert.Equal(4, order.Count);
+            Assert.Equal(new[] { "part1", "part2", "part3", "part4" }, order.Select(name => name[7..^4]).ToArray());
+            Assert.All(form.ProcessingHistory, j => Assert.Equal(ProcessingStatus.Completed, j.Status));
+            reopened.Close(); form.Close();
+            using var restored = new MainForm(() => Task.FromResult(Devices), () => Task.FromResult(EmptyActivity), request => new FakeSession(request), settingsFile);
+            Assert.Equal(4, restored.ProcessingHistory.Length);
+        }
+        finally { release.TrySetResult(); await form.ProcessingCompletion; if (Directory.Exists(directory)) Directory.Delete(directory, true); }
+    });
+
+    [Fact]
+    public Task ArchiveSupportsOrderedCombinedAndIndividualJobsAndANewPromptWithoutBlockingCapture() => OnUiThread(async () =>
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "vocrec-archive-ui-" + Guid.NewGuid().ToString("N"));
+        string input = Path.Combine(directory, "input"); Directory.CreateDirectory(input);
+        string a = Path.Combine(input, "A.md"), b = Path.Combine(input, "B.md"); File.WriteAllText(a, "a"); File.WriteAllText(b, "b");
+        var seen = new System.Collections.Concurrent.ConcurrentQueue<ProcessingJob>();
+        string settingsFile = Path.Combine(directory, "settings.json");
+        File.WriteAllText(settingsFile, System.Text.Json.JsonSerializer.Serialize(new { Folder = directory, Processing = new PostProcessingSettings
+        { TranscriptFolder = input, SummaryFolder = Path.Combine(directory, "summary"), LlmUrl = "http://localhost", LlmModel = "qwen", LlmPrompt = "İlk prompt" } }));
+        using var form = new MainForm(() => Task.FromResult(Devices), () => Task.FromResult(EmptyActivity), request => new FakeSession(request), settingsFile,
+            processManual: (job, report) => { seen.Enqueue(job); report("LLM özeti hazırlanıyor"); return Task.CompletedTask; });
+        try
+        {
+            form.ShowInTaskbar = false; form.Show();
+            var popup = form.OpenProcessingHub(); popup.Size = popup.MinimumSize;
+            await popup.LoadLibraryAsync(false, input);
+            var controls = Descendants(popup).ToArray(); var list = (ListView)controls.Single(c => c.AccessibleName == "Arşiv dosyaları");
+            Assert.Equal(2, list.Items.Count);
+            foreach (ListViewItem item in list.Items) item.Checked = true;
+            list.Items[1].Selected = true;
+            controls.OfType<Button>().Single(c => c.Text == "↑ Yukarı").PerformClick();
+            controls.OfType<TextBox>().Single(c => c.AccessibleName == "Yeni özet adı").Text = "Birleşik Toplantı";
+            foreach (var button in controls.OfType<Button>().Where(c => c.Visible))
+                Assert.True(popup.ClientRectangle.Contains(popup.RectangleToClient(button.RectangleToScreen(button.ClientRectangle))), button.Text);
+            await form.StartAsync();
+            controls.OfType<Button>().Single(c => c.Text == "Seçilenlerden tek özet").PerformClick();
+            await form.ProcessingCompletion.WaitAsync(TimeSpan.FromSeconds(5));
+            var first = Assert.Single(seen); Assert.Equal(new[] { b, a }, first.Sources); Assert.Equal("İlk prompt", first.Settings.LlmPrompt);
+            Assert.Equal(ProcessingKind.TextSummary, first.Kind);
+            ((TextBox)Descendants(form).Single(c => c.AccessibleName == "Özet prompt")).Text = "Yeni prompt";
+            var history = (ListView)Descendants(popup).Single(c => c.AccessibleName == "İşlem geçmişi");
+            history.Items[0].Selected = true;
+            controls.OfType<Button>().Single(c => c.Text == "Güncel promptla yeni özet").PerformClick();
+            await form.ProcessingCompletion.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.Equal(2, seen.Count); Assert.Equal("Yeni prompt", seen.Last().Settings.LlmPrompt); Assert.NotEqual(first.Id, seen.Last().Id);
+            await popup.LoadLibraryAsync(false, input); foreach (ListViewItem item in list.Items) item.Checked = true;
+            controls.OfType<Button>().Single(c => c.Text == "Ayrı ayrı özetle").PerformClick();
+            await form.ProcessingCompletion.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.Equal(4, seen.Count); Assert.All(seen.Skip(2), j => Assert.Single(j.Sources));
+            await form.StopAsync(); popup.Close(); form.Close();
+        }
+        finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
+    });
+
     private static IEnumerable<Control> Descendants(Control parent)
     {
         foreach (Control child in parent.Controls)
@@ -589,10 +682,10 @@ public class RecordingStartTests
     {
         private readonly TaskCompletionSource completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private bool disposed;
-        public FakeSession(RecordingRequest request)
+        public FakeSession(RecordingRequest request, string? outputName = null)
         {
             Automatic = request.Automatic;
-            OutputPath = Path.Combine(request.Folder, RecordingDates.WithPrefix("test.m4a", DateOnly.FromDateTime(DateTime.Now)));
+            OutputPath = Path.Combine(request.Folder, RecordingDates.WithPrefix(outputName ?? "test.m4a", DateOnly.FromDateTime(DateTime.Now)));
             SyncSources(request.Sources);
         }
         public bool Automatic { get; set; }

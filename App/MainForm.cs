@@ -33,7 +33,7 @@ public sealed partial class MainForm : Form
     private readonly System.Windows.Forms.Timer timer = new() { Interval = 100 };
     private readonly List<Control> configuration = [];
     private IRecordingSession? session;
-    private bool busy, closingAllowed;
+    private bool busy, closingAllowed, closingRequested;
     private string? lastFile;
     private readonly string settingsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Vocrec2", "settings.json");
     private Settings settings = new();
@@ -46,13 +46,16 @@ public sealed partial class MainForm : Form
 
     internal MainForm(Func<Task<ObservedDevice[]>> readDevices, Func<Task<ActivitySnapshot>> readActivity,
         Func<RecordingRequest, IRecordingSession> createRecording, string? settingsFile = null,
-        Func<string, PostProcessingSettings, Action<string>, bool, Task>? processRecording = null)
+        Func<string, PostProcessingSettings, Action<string>, bool, Task>? processRecording = null,
+        Func<ProcessingJob, Action<string>, Task>? processManual = null)
     {
         this.readDevices = readDevices;
         this.readActivity = readActivity;
         this.createRecording = createRecording;
         this.processRecording = processRecording ?? ProcessRecordingAsync;
         if (settingsFile != null) settingsPath = settingsFile;
+        this.processManual = processManual ?? ProcessManualAsync;
+        processingQueue = new ProcessingQueue(Path.Combine(Path.GetDirectoryName(settingsPath)!, "history"), ExecuteJobAsync);
         Text = $"Vocrec2 v{AppVersion.Number} · Ses kayıt stüdyosu";
         var windowIcon = (Icon)AppLogo.Icon.Clone(); Icon = windowIcon;
         Disposed += (_, _) => windowIcon.Dispose();
@@ -61,6 +64,7 @@ public sealed partial class MainForm : Form
         MinimumSize = new Size(960, 720); Size = new Size(1020, 760); StartPosition = FormStartPosition.CenterScreen;
         BuildLayout();
         InitializeProcessingControls();
+        InitializeHistory();
         browse.Click += (_, _) =>
         {
             using var dialog = new FolderBrowserDialog { InitialDirectory = folder.Text, Description = "Ses kayıtlarının kaydedileceği klasörü seçin", UseDescriptionForTitle = true };
@@ -87,6 +91,7 @@ public sealed partial class MainForm : Form
         {
             if (closingAllowed) return;
             if (busy) { e.Cancel = true; return; }
+            closingRequested = true;
             if (session != null)
             {
                 e.Cancel = true; await StopAsync(); busy = true; start.Enabled = false; await processingTask; closingAllowed = true; Close();
@@ -346,7 +351,7 @@ public sealed partial class MainForm : Form
         }
         catch (Exception ex) { status.Text = "Ayarlar kaydedilemedi: " + ex.Message; }
     }
-    protected override void Dispose(bool disposing) { if (disposing) { timer.Dispose(); discoveryTimer.Dispose(); hints.Dispose(); session?.Dispose(); } base.Dispose(disposing); }
+    protected override void Dispose(bool disposing) { if (disposing) { historyTimer.Dispose(); processingHub?.Dispose(); timer.Dispose(); discoveryTimer.Dispose(); hints.Dispose(); session?.Dispose(); } base.Dispose(disposing); }
     private static Label LabelText(string value, int fontSize = 10) => new() { Text = value, Dock = DockStyle.Fill, AutoSize = false, TextAlign = ContentAlignment.MiddleLeft, ForeColor = StudioTheme.Muted, Font = new Font("Segoe UI", fontSize), AutoEllipsis = true, Margin = Padding.Empty };
     private static StudioButton MakeButton(string text) => new() { Text = text, Dock = DockStyle.Fill };
 

@@ -17,7 +17,6 @@ public sealed class RecordingPostProcessor(HttpClient http, Func<string, Cancell
         await gate.WaitAsync(token);
         try
         {
-            progress("STT · " + Path.GetFileName(audio));
             Directory.CreateDirectory(settings.TranscriptFolder);
             DateOnly recordedOn = RecordingDates.FromAudio(audio);
             string sourceName = Path.GetFileNameWithoutExtension(audio);
@@ -26,10 +25,17 @@ public sealed class RecordingPostProcessor(HttpClient http, Func<string, Cancell
             string previousTranscript = Path.Combine(settings.TranscriptFolder, sourceName + ".md");
             string legacyTranscript = Path.Combine(settings.TranscriptFolder, sourceName + ".txt");
             string? cachedTranscript = File.Exists(transcript) ? transcript : File.Exists(previousTranscript) ? previousTranscript : File.Exists(legacyTranscript) ? legacyTranscript : null;
+            progress((cachedTranscript == null ? "STT başladı · " : "STT · mevcut metin okunuyor · ") + Path.GetFileName(audio));
             string text = cachedTranscript != null ? await File.ReadAllTextAsync(cachedTranscript, token) : await transcribe(audio, token);
             await WriteAtomicAsync(transcript, text, token);
+            if (File.Exists(audio))
+            {
+                string cache = AudioTranscriptCache.FilePath(settings.TranscriptFolder, audio);
+                Directory.CreateDirectory(Path.GetDirectoryName(cache)!); await WriteAtomicAsync(cache, text, token);
+            }
             progress("Metin kaydedildi: " + transcript);
-            if (settings.Endpoint() == null || string.IsNullOrWhiteSpace(text)) return;
+            if (settings.Endpoint() == null) { progress("LLM atlandı · servis adresi girilmedi"); return; }
+            if (string.IsNullOrWhiteSpace(text)) { progress("LLM atlandı · STT metni boş"); return; }
             string summaryFolder = RecordingDates.SummaryFolder(settings.SummaryFolder, recordedOn);
             Directory.CreateDirectory(summaryFolder);
             string stateFolder = Path.Combine(settings.TranscriptFolder, ".vocrec2");

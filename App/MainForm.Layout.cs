@@ -91,8 +91,12 @@ public sealed partial class MainForm
         recordingTab.KeyDown += (_, e) => { if (e.KeyCode == Keys.Right) { processingTab.Focus(); SelectWorkspace(true); e.Handled = true; } };
         processingTab.KeyDown += (_, e) => { if (e.KeyCode == Keys.Left) { recordingTab.Focus(); SelectWorkspace(false); e.Handled = true; } };
         navigation.Controls.Add(segments, 0, 0);
+        var activity = Grid(2, 1);
+        activity.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); activity.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 240));
         var flowHint = LabelText("Kayıt  →  Metin  →  Özet", 9); flowHint.TextAlign = ContentAlignment.MiddleRight;
-        flowHint.Margin = new Padding(10, 0, 0, 10); navigation.Controls.Add(flowHint, 1, 0);
+        flowHint.Margin = new Padding(6, 0, 12, 10); activity.Controls.Add(flowHint, 0, 0);
+        historyButton.Margin = new Padding(0, 0, 0, 10); activity.Controls.Add(historyButton, 1, 0);
+        navigation.Controls.Add(activity, 1, 0);
         root.Controls.Add(navigation, 0, 1);
         SelectWorkspace(false);
 
