@@ -56,3 +56,6 @@ Vocrec2 doğrulama
   taramalar seçimi geri almaz. Tüm kaynaklar kaldırılınca sessizlikle devam eder.
 - Özetler kayıt gününe ait ggAAYY alt klasöründe toplanır. Aynı gün,
   farklı gün, çakışma ve eski tamamlanmış işin LLM'siz devamı testleri eklendi.
+
+- Özet Markdown dosya adından tarih ön eki kaldırıldı; tarih yalnız
+  günlük klasörde kalır. Ses ve STT metni adları kayıt tarihini korur.

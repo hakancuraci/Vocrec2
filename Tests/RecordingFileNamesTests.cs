@@ -42,14 +42,14 @@ public class RecordingFileNamesTests
             File.WriteAllText(Path.Combine(settings.TranscriptFolder, ".vocrec2", "231126_Toplantı_4.summary.json"), "old checkpoint");
             string daily = RecordingDates.SummaryFolder(settings.SummaryFolder, new DateOnly(2026, 11, 23));
             Directory.CreateDirectory(daily);
-            File.WriteAllText(Path.Combine(daily, "231126_Toplantı_5.ozet.md"), "daily summary");
+            File.WriteAllText(Path.Combine(daily, "Toplantı_5.ozet.md"), "daily summary");
             string renamed = RecordingFileNames.RenameCompleted(audio, "Toplantı", settings);
             Assert.Equal(Path.Combine(root, "231126_Toplantı_6.m4a"), renamed);
             Assert.False(File.Exists(audio)); Assert.Equal("new audio", File.ReadAllText(renamed));
             Assert.Equal("old audio", File.ReadAllText(Path.Combine(root, "231126_Toplantı.m4a")));
             Assert.Equal("old transcript", File.ReadAllText(Path.Combine(settings.TranscriptFolder, "231126_Toplantı_2.md")));
             Assert.Equal("old summary", File.ReadAllText(Path.Combine(settings.SummaryFolder, "231126_Toplantı_3.ozet.md")));
-            Assert.Equal("daily summary", File.ReadAllText(Path.Combine(daily, "231126_Toplantı_5.ozet.md")));
+            Assert.Equal("daily summary", File.ReadAllText(Path.Combine(daily, "Toplantı_5.ozet.md")));
             Assert.Equal(renamed, RecordingFileNames.RenameCompleted(renamed, "Toplantı_6", settings));
         }
         finally { Directory.Delete(root, true); }

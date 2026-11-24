@@ -24,7 +24,7 @@ public class RecordingDatesTests
         => Assert.Equal(expected, RecordingDates.WithPrefix(name, new DateOnly(2026, 11, 23)));
 
     [Fact]
-    public async Task DatePrefixDoesNotTruncateAManualNameOrApplyTheLlmWordLimit()
+    public async Task RemovesDatePrefixWithoutTruncatingAManualNameOrApplyingTheLlmWordLimit()
     {
         string root = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
@@ -33,7 +33,7 @@ public class RecordingDatesTests
             string name = "Bir iki üç dört beş altı yedi " + new string('a', 90);
             var date = new DateOnly(2026, 11, 23);
             string output = await SummaryFileNames.WriteUniqueAsync(root, RecordingDates.WithPrefix(name, date), "özet", default, preserveRecordingName: true, recordedOn: date);
-            Assert.Equal("231126_" + name + ".ozet.md", Path.GetFileName(output));
+            Assert.Equal(name + ".ozet.md", Path.GetFileName(output));
         }
         finally { Directory.Delete(root, true); }
     }
@@ -72,7 +72,7 @@ public class RecordingDatesTests
             await resumed.ProcessAsync(audio, settings, _ => { }, useRecordingName: manual);
             await resumed.ProcessAsync(audio, settings, _ => { }, useRecordingName: manual);
             string summary = Assert.Single(Directory.GetFiles(root, "*.ozet.md", SearchOption.AllDirectories));
-            Assert.Equal(manual ? "311225_Proje Toplantısı.ozet.md" : "311225_Proje Kararları.ozet.md", Path.GetFileName(summary));
+            Assert.Equal(manual ? "Proje Toplantısı.ozet.md" : "Proje Kararları.ozet.md", Path.GetFileName(summary));
             Assert.Equal(Path.Combine(root, "311225"), Path.GetDirectoryName(summary));
             Assert.Equal("# Proje özeti", await File.ReadAllTextAsync(summary));
             Assert.True(File.Exists(Path.Combine(root, "311225_Proje Toplantısı.md")));

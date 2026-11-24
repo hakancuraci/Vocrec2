@@ -364,14 +364,14 @@ public class PostProcessingTests
             var resumed = new RecordingPostProcessor(http, (_, _) => throw new Exception("Do not repeat STT"));
             await resumed.ProcessAsync("231126_Eski.m4a", settings, _ => { });
             await resumed.ProcessAsync("231126_Eski.m4a", settings, _ => { });
-            Assert.Equal("Korunan eski özet", await File.ReadAllTextAsync(Path.Combine(settings.SummaryFolder, "231126", "231126_Eski Toplantı.ozet.md")));
+            Assert.Equal("Korunan eski özet", await File.ReadAllTextAsync(Path.Combine(settings.SummaryFolder, "231126", "Eski Toplantı.ozet.md")));
             Assert.True(File.Exists(oldOutput)); Assert.Equal(3, requests);
             Assert.Single(Directory.GetFiles(Path.Combine(settings.SummaryFolder, "231126"), "*.ozet.md"));
         }
         finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
     }
 
-    private static string SummaryPath(string root, string name) => Path.Combine(RecordingDates.SummaryFolder(root, DateOnly.FromDateTime(DateTime.Now)), Dated(name));
+    private static string SummaryPath(string root, string name) => Path.Combine(RecordingDates.SummaryFolder(root, DateOnly.FromDateTime(DateTime.Now)), name);
 
     private static string Dated(string name) => RecordingDates.WithPrefix(name, DateOnly.FromDateTime(DateTime.Now));
 

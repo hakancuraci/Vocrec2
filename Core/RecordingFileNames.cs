@@ -29,7 +29,8 @@ public static class RecordingFileNames
         title = RecordingDates.WithPrefix(title, recordedOn);
         string original = Path.GetFullPath(audio);
         string folder = Path.GetDirectoryName(original)!;
-        string[] outputFolders = [folder, settings.TranscriptFolder, settings.SummaryFolder, RecordingDates.SummaryFolder(settings.SummaryFolder, recordedOn)];
+        string dailySummaryFolder = RecordingDates.SummaryFolder(settings.SummaryFolder, recordedOn);
+        string[] outputFolders = [folder, settings.TranscriptFolder, settings.SummaryFolder, dailySummaryFolder];
         string[] extensions = [".m4a", ".partial.m4a", ".md", ".txt", ".ozet.md", ".ozet.txt"];
         for (int index = 1; index <= 10000; index++)
         {
@@ -40,7 +41,8 @@ public static class RecordingFileNames
                 string candidate = Path.GetFullPath(Path.Combine(directory, name + extension));
                 return !string.Equals(candidate, original, StringComparison.OrdinalIgnoreCase) && Path.Exists(candidate);
             }) || Path.Exists(Path.Combine(directory, ".vocrec2", name + ".summary.json")));
-            if (occupied) continue;
+            string summaryName = RecordingDates.WithoutPrefix(name, recordedOn);
+            if (occupied || Path.Exists(Path.Combine(dailySummaryFolder, summaryName + ".ozet.md"))) continue;
             if (string.Equals(output, original, StringComparison.OrdinalIgnoreCase)) return audio;
             try { File.Move(audio, output); return output; }
             catch (IOException) when (Path.Exists(output)) { /* Another writer won this name; try the next suffix. */ }

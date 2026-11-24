@@ -21,7 +21,6 @@ public static class SummaryFileNames
     {
         if (recordedOn is { } date) title = RecordingDates.WithoutPrefix(title, date);
         title = preserveRecordingName ? RecordingFileNames.Normalize(title) ?? "Kayıt" : Normalize(title);
-        if (recordedOn is { } day) title = RecordingDates.WithPrefix(title, day);
         for (int index = 1; index <= 10000; index++)
         {
             string path = Path.Combine(folder, title + (index == 1 ? "" : "_" + index) + ".ozet.md");
