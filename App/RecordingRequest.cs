@@ -6,7 +6,7 @@ internal sealed record RecordingRequest(DeviceChoice[] Sources, string Folder, i
 
 public interface IRecordingSession : IDisposable
 {
-    bool Automatic { get; }
+    bool Automatic { get; set; }
     AudioMixer Mixer { get; }
     MixerInput[] Inputs { get; }
     Task Completion { get; }

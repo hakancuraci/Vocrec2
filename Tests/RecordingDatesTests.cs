@@ -71,8 +71,9 @@ public class RecordingDatesTests
             var resumed = new RecordingPostProcessor(http, (_, _) => throw new Exception("Saved transcript must be reused"));
             await resumed.ProcessAsync(audio, settings, _ => { }, useRecordingName: manual);
             await resumed.ProcessAsync(audio, settings, _ => { }, useRecordingName: manual);
-            string summary = Assert.Single(Directory.GetFiles(root, "*.ozet.md"));
+            string summary = Assert.Single(Directory.GetFiles(root, "*.ozet.md", SearchOption.AllDirectories));
             Assert.Equal(manual ? "311225_Proje Toplantısı.ozet.md" : "311225_Proje Kararları.ozet.md", Path.GetFileName(summary));
+            Assert.Equal(Path.Combine(root, "31.12.2025"), Path.GetDirectoryName(summary));
             Assert.Equal("# Proje özeti", await File.ReadAllTextAsync(summary));
             Assert.True(File.Exists(Path.Combine(root, "311225_Proje Toplantısı.md")));
             Assert.Equal(1, stt); Assert.Equal(manual ? 2 : 3, requests);

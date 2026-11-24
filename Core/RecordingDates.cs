@@ -5,6 +5,7 @@ namespace SesKayit.Core;
 
 public static class RecordingDates
 {
+    public static string SummaryFolder(string root, DateOnly date) => Path.Combine(root, date.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture));
     public static string Prefix(DateOnly date) => date.ToString("ddMMyy", CultureInfo.InvariantCulture) + "_";
 
     public static string WithoutPrefix(string name, DateOnly date)

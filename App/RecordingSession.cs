@@ -16,7 +16,7 @@ public sealed class RecordingSession : IRecordingSession
     private readonly MMDeviceEnumerator enumerator = new();
     private bool stopping;
     private readonly bool enhanceMicrophone;
-    public bool Automatic { get; }
+    public bool Automatic { get; set; }
     public AudioMixer Mixer { get; private set; } = null!;
     public MixerInput[] Inputs => Mixer.CurrentInputs;
     public Task Completion { get; private set; } = Task.CompletedTask;
@@ -46,7 +46,7 @@ public sealed class RecordingSession : IRecordingSession
         catch { Dispose(); throw; }
     }
 
-    private void AddSources(IEnumerable<DeviceChoice> choices)
+    private void AddSources(IEnumerable<DeviceChoice> choices, bool tolerateFailures = false)
     {
         var warnings = new List<string>();
         foreach (var choice in choices.DistinctBy(c => c.Id))
@@ -55,7 +55,7 @@ public sealed class RecordingSession : IRecordingSession
             try { sources.Add(choice.Id, new SourceCapture(enumerator.GetDevice(choice.Id), choice, enhanceMicrophone)); }
             catch (Exception ex)
             {
-                if (!Automatic) throw;
+                if (!Automatic && !tolerateFailures) throw;
                 warnings.Add($"Kaynak açılamadı: {choice.Name}: {ex.Message}");
             }
         }
@@ -65,15 +65,17 @@ public sealed class RecordingSession : IRecordingSession
     // Called serially by the UI, never concurrently with StopAsync or Dispose.
     public void SyncSources(IEnumerable<DeviceChoice> choices)
     {
-        if (!Automatic || stopping) return;
+        if (stopping) return;
         var desired = choices.DistinctBy(c => c.Id).ToArray();
         var wanted = desired.Select(c => c.Id).ToHashSet();
-        AddSources(desired);
-        var removed = sources.Where(p => !wanted.Contains(p.Key)).ToArray();
+        var removed = sources.Where(p => !wanted.Contains(p.Key) || p.Value.Error != null).ToArray();
         foreach (var pair in removed) sources.Remove(pair.Key);
         Mixer.SetInputs(sources.Values.Select(s => s.Input));
         foreach (var pair in removed) pair.Value.Dispose();
-        // Disconnected endpoints have now been removed. Remaining errors are real capture failures.
+        // Reopen failed devices only after their previous capture is detached and disposed.
+        // A failing new device must not interrupt the remaining sources or the encoder.
+        AddSources(desired, tolerateFailures: true);
+        Mixer.SetInputs(sources.Values.Select(s => s.Input));
     }
 
     public async Task StopAsync()

@@ -36,6 +36,18 @@ Eski dosyalar topluca yeniden adlandırılmaz. Bekleyen eski işlerde önce ses 
 
 Özet prompt alanı uzun metinleri ve tekrar yapıştırmayı destekler; varsayılan 32.767 karakterlik giriş sınırı kaldırılmıştır. Kaydırma çubuğu, yapıştırma sırasında Windows metin kontrolünü yeniden oluşturmamak için sabittir. Prompt metni seçili profille birlikte kalıcı kaydedilir.
 
+## Kayıt sırasında kaynak değiştirme
+
+**Otomatik kanal keşfi** kayıt sürerken açılıp kapatılabilir. Bilgisayar sesi veya mikrofon listesindeki işaretleri doğrudan değiştirerek bir kaynağı ekleyebilir veya kaldırabilirsiniz. Elle seçim yaptığınızda otomatik keşif kapanır; sonraki tarama kaldırdığınız mikrofonu yeniden seçmez. Otomatik keşfi tekrar açmak mevcut tüm kaynakları seçer ve yeni bağlanan cihazları izler. Elle modda yeni cihaz listede görünür; kayda eklemek için işaretleyin.
+
+Değişiklik aynı `.m4a` kaydı içinde uygulanır; sayaç ve kodlayıcı yeniden başlatılmaz. Tüm kaynakları kaldırırsanız kaynak yeniden seçilene kadar sessizlik kaydedilir. Açılmayan yeni bir cihaz uyarı olarak gösterilir; çalışan diğer kaynakların kaydı devam eder. Kayıt hazırlanırken veya bitirilirken kaynak kontrolleri kısa süre kilitlenir.
+
+## Günlük özet klasörleri
+
+LLM özetleri seçtiğiniz özet çıktı klasörü altında **`gg.AA.yyyy`** günlük klasörlerinde toplanır. Örnek: `Ozetler/24.11.2026/241126_Proje Toplantısı.ozet.md`. Aynı günün tüm özetleri aynı klasöre, ertesi günün kayıtları yeni klasöre yazılır. Bu kural elle ad verilen ve LLM ile adlandırılan özetlere uygulanır. Kullanılan tarih kaydın başladığı gündür; özet sonraki gün tamamlansa veya bekleyen iş yeniden denense de aynı klasörde kalır. Ses ve STT metni mevcut çıktı klasörlerini kullanmaya devam eder.
+
+Eski düz klasör sürümünden kalan bekleyen bir işin özeti zaten tamamlanmışsa, yeniden LLM çağrısı yapılmadan günlük klasöre kopyalanır ve işlem eşlemesi güncellenir; özgün dosya korunur.
+
 ## Kalıcı ayarlar ve hata sonrası devam
 
 Ayarlar `%LOCALAPPDATA%/Vocrec2/settings.json` içinde atomik olarak saklanır. Vocrec'in mevcut ayarlarından ayrı tutulur. Çıktı klasörleri seçimden sonra otomatik kaydedilir; elle yazılan yollar alanı terk ederken veya uygulama kapanırken kaydedilir. LLM alanları hatalı/eksik olsa da klasör kaydı yapılır. Profiller **Ayarları kaydet** ile saklanabilir; profil değiştirirken ve kapanışta mevcut alanlar da korunur. Sıraya alınmış işler o andaki seçili profilin kopyasını kullanır; devam eden bir kayıt/işin bağlantısı sonradan profil değiştirerek değiştirilmez.

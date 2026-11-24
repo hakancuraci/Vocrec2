@@ -29,7 +29,7 @@ public static class RecordingFileNames
         title = RecordingDates.WithPrefix(title, recordedOn);
         string original = Path.GetFullPath(audio);
         string folder = Path.GetDirectoryName(original)!;
-        string[] outputFolders = [folder, settings.TranscriptFolder, settings.SummaryFolder];
+        string[] outputFolders = [folder, settings.TranscriptFolder, settings.SummaryFolder, RecordingDates.SummaryFolder(settings.SummaryFolder, recordedOn)];
         string[] extensions = [".m4a", ".partial.m4a", ".md", ".txt", ".ozet.md", ".ozet.txt"];
         for (int index = 1; index <= 10000; index++)
         {

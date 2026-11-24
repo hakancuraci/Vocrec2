@@ -142,6 +142,7 @@ internal sealed class LevelMeter : Control
 internal sealed class DevicePicker : ListBox
 {
     private readonly HashSet<int> checks = [];
+    public event EventHandler? ItemChecksChanged;
     public IEnumerable<object> CheckedItems => Items.Cast<object>().Where((_, i) => checks.Contains(i));
     public DevicePicker()
     {
@@ -152,7 +153,7 @@ internal sealed class DevicePicker : ListBox
     public void SetItemChecked(int index, bool selected)
     {
         bool changed = selected ? checks.Add(index) : checks.Remove(index);
-        if (changed) Invalidate();
+        if (changed) { Invalidate(); ItemChecksChanged?.Invoke(this, EventArgs.Empty); }
     }
     protected override void OnDrawItem(DrawItemEventArgs e)
     {

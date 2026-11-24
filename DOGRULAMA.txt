@@ -50,3 +50,9 @@ Vocrec2 doğrulama
   kaydın başladığı gün alınır; elle/LLM adlandırmasında, eski tarihli
   kayıtların yeniden işlenmesinde ve bekleyen işlerde korunur.
   Yinelenen ön ek, uzun elle ad, eski otomatik ad ve çakışma testleri eklendi.
+
+- Kayıt sürerken otomatik/elle mod geçişleri ve canlı mikrofon/çıkış
+  ekleme-kaldırma açıldı. Elle seçim otomatik keşfi kapatır; geç gelen
+  taramalar seçimi geri almaz. Tüm kaynaklar kaldırılınca sessizlikle devam eder.
+- Özetler kayıt gününe ait gg.AA.yyyy alt klasöründe toplanır. Aynı gün,
+  farklı gün, çakışma ve eski tamamlanmış işin LLM'siz devamı testleri eklendi.

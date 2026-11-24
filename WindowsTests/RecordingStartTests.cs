@@ -471,6 +471,86 @@ public class RecordingStartTests
         finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
     });
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public Task SourcesAndAutomaticDiscoveryCanChangeWithoutRestartingTheRecording(bool startAutomatic) => OnUiThread(async () =>
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "vocrec-live-sources-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        string file = Path.Combine(directory, "settings.json");
+        File.WriteAllText(file, System.Text.Json.JsonSerializer.Serialize(new { Folder = directory, Automatic = startAutomatic, Devices = Devices.Select(d => d.Id).ToArray() }));
+        ObservedDevice[] available = Devices;
+        FakeSession? recording = null; int starts = 0;
+        using var form = new MainForm(() => Task.FromResult(available), () => Task.FromResult(EmptyActivity),
+            request => { starts++; return recording = new FakeSession(request); }, file);
+        try
+        {
+            await form.StartAsync();
+            var controls = Descendants(form).ToArray();
+            var mode = Assert.IsAssignableFrom<CheckBox>(controls.Single(c => c.AccessibleName == "Otomatik kaynak seçimi"));
+            var mic = Assert.IsType<DevicePicker>(controls.Single(c => c.AccessibleName == "Mikrofonlar kaynakları"));
+            var output = Assert.IsType<DevicePicker>(controls.Single(c => c.AccessibleName == "Bilgisayar sesi kaynakları"));
+            Assert.True(mode.Enabled); Assert.True(mic.Enabled); Assert.True(output.Enabled);
+            string audio = recording!.OutputPath;
+            byte[] pcm = new byte[192]; recording.Mixer.Read(pcm, 0, pcm.Length);
+            mic.SetItemChecked(1, false); // Remove the second microphone, including from automatic mode.
+            Assert.False(mode.Checked); Assert.False(recording.Automatic);
+            Assert.DoesNotContain("idle-usb-mic", recording.SourceHistory.Last());
+            await form.RefreshChannelsAsync();
+            Assert.DoesNotContain("idle-usb-mic", recording.SourceHistory.Last());
+            mic.SetItemChecked(0, false); output.SetItemChecked(0, false);
+            Assert.Empty(recording.Inputs);
+            recording.Mixer.Read(pcm, 0, pcm.Length);
+            Assert.All(pcm, b => Assert.Equal(0, b));
+            Assert.False(recording.Completion.IsCompleted);
+            mode.Checked = true;
+            Assert.True(recording.Automatic); Assert.Equal(3, recording.Inputs.Length);
+            mode.Checked = false;
+            Assert.Equal(3, recording.Inputs.Length); // Disabling discovery preserves the current selection.
+            mic.SetItemChecked(0, false);
+            available = [.. Devices, new("new-mic", "Yeni mikrofon", true, false, false)];
+            await form.RefreshChannelsAsync();
+            Assert.DoesNotContain("new-mic", recording.SourceHistory.Last());
+            Assert.DoesNotContain("default-mic", recording.SourceHistory.Last());
+            mode.Checked = true;
+            Assert.Contains("new-mic", recording.SourceHistory.Last());
+            available = available.Where(d => d.Id != "idle-usb-mic").ToArray();
+            await form.RefreshChannelsAsync();
+            Assert.DoesNotContain("idle-usb-mic", recording.SourceHistory.Last());
+            Assert.Equal(3, recording.Inputs.Length);
+            recording.Mixer.Read(pcm, 0, pcm.Length);
+            Assert.Equal(TimeSpan.FromMilliseconds(3), recording.Mixer.Duration);
+            Assert.Equal(1, starts); Assert.Equal(audio, recording.OutputPath); Assert.False(recording.Completion.IsCompleted);
+            await form.StopAsync();
+        }
+        finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
+    });
+
+    [Fact]
+    public Task ASlowDiscoveryResultDoesNotRestoreAMicrophoneRemovedDuringRecording() => OnUiThread(async () =>
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "vocrec-source-race-" + Guid.NewGuid().ToString("N"));
+        int reads = 0; FakeSession? recording = null;
+        var nextScan = new TaskCompletionSource<ObservedDevice[]>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var form = new MainForm(() => ++reads == 1 ? Task.FromResult(Devices) : nextScan.Task, () => Task.FromResult(EmptyActivity),
+            request => recording = new FakeSession(request), Path.Combine(directory, "settings.json"));
+        try
+        {
+            await form.StartAsync();
+            var mode = (CheckBox)Descendants(form).Single(c => c.AccessibleName == "Otomatik kaynak seçimi");
+            var mic = (DevicePicker)Descendants(form).Single(c => c.AccessibleName == "Mikrofonlar kaynakları");
+            var refresh = form.RefreshChannelsAsync(); Assert.False(refresh.IsCompleted);
+            mode.Checked = false; mic.SetItemChecked(1, false);
+            nextScan.SetResult(Devices); await refresh;
+            Assert.False(mode.Checked); Assert.False(recording!.Automatic);
+            Assert.DoesNotContain("idle-usb-mic", recording.SourceHistory.Last());
+            Assert.False(recording.Completion.IsCompleted);
+            await form.StopAsync();
+        }
+        finally { nextScan.TrySetResult(Devices); if (Directory.Exists(directory)) Directory.Delete(directory, true); }
+    });
+
     private static IEnumerable<Control> Descendants(Control parent)
     {
         foreach (Control child in parent.Controls)
@@ -513,8 +593,9 @@ public class RecordingStartTests
         {
             Automatic = request.Automatic;
             OutputPath = Path.Combine(request.Folder, RecordingDates.WithPrefix("test.m4a", DateOnly.FromDateTime(DateTime.Now)));
+            SyncSources(request.Sources);
         }
-        public bool Automatic { get; }
+        public bool Automatic { get; set; }
         public AudioMixer Mixer { get; } = new([new(new Silence(), false)]);
         public MixerInput[] Inputs => Mixer.CurrentInputs;
         public Task Completion => completion.Task;
@@ -522,7 +603,12 @@ public class RecordingStartTests
         public string PartialPath => OutputPath + ".partial";
         public Exception? CaptureError => null;
         public string? Warning => null;
-        public void SyncSources(IEnumerable<DeviceChoice> choices) { }
+        public List<string[]> SourceHistory { get; } = [];
+        public void SyncSources(IEnumerable<DeviceChoice> choices)
+        {
+            var selected = choices.ToArray(); SourceHistory.Add(selected.Select(c => c.Id).ToArray());
+            Mixer.SetInputs(selected.Select(c => new MixerInput(new Silence(), c.Microphone)));
+        }
         public Task StopAsync() { Mixer.Finish(); completion.TrySetResult(); return Task.CompletedTask; }
         public void Dispose() { if (disposed) return; disposed = true; completion.TrySetResult(); Mixer.Dispose(); }
     }

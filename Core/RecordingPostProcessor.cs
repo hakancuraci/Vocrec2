@@ -30,11 +30,13 @@ public sealed class RecordingPostProcessor(HttpClient http, Func<string, Cancell
             await WriteAtomicAsync(transcript, text, token);
             progress("Metin kaydedildi: " + transcript);
             if (settings.Endpoint() == null || string.IsNullOrWhiteSpace(text)) return;
-            Directory.CreateDirectory(settings.SummaryFolder);
+            string summaryFolder = RecordingDates.SummaryFolder(settings.SummaryFolder, recordedOn);
+            Directory.CreateDirectory(summaryFolder);
             string stateFolder = Path.Combine(settings.TranscriptFolder, ".vocrec2");
             Directory.CreateDirectory(stateFolder);
             string statePath = Path.Combine(stateFolder, sourceName + ".summary.json");
-            string fallback = Path.Combine(settings.SummaryFolder, name + ".ozet.md");
+            string fallback = Path.Combine(summaryFolder, name + ".ozet.md");
+            string previousDatedFallback = Path.Combine(settings.SummaryFolder, name + ".ozet.md");
             string previousFallback = Path.Combine(settings.SummaryFolder, sourceName + ".ozet.md");
             string legacyFallback = Path.Combine(settings.SummaryFolder, sourceName + ".ozet.txt");
             SummaryState? state = null;
@@ -46,12 +48,13 @@ public sealed class RecordingPostProcessor(HttpClient http, Func<string, Cancell
             if (state?.OutputPath != null && File.Exists(state.OutputPath))
             {
                 if (!string.Equals(Path.GetExtension(state.OutputPath), ".md", StringComparison.OrdinalIgnoreCase) ||
-                    !Path.GetFileName(state.OutputPath).StartsWith(RecordingDates.Prefix(recordedOn), StringComparison.Ordinal))
+                    !Path.GetFileName(state.OutputPath).StartsWith(RecordingDates.Prefix(recordedOn), StringComparison.Ordinal) ||
+                    !string.Equals(Path.GetDirectoryName(Path.GetFullPath(state.OutputPath)), Path.GetFullPath(summaryFolder), StringComparison.OrdinalIgnoreCase))
                 {
                     // Resume older completed jobs without transcribing or asking the LLM again.
                     string previous = await File.ReadAllTextAsync(state.OutputPath, token);
                     string title = state.Title ?? Path.GetFileNameWithoutExtension(state.OutputPath).Replace(".ozet", "");
-                    string migrated = await SummaryFileNames.WriteUniqueAsync(settings.SummaryFolder, title, previous, token, preserveRecordingName: useRecordingName, recordedOn: recordedOn);
+                    string migrated = await SummaryFileNames.WriteUniqueAsync(summaryFolder, title, previous, token, preserveRecordingName: useRecordingName, recordedOn: recordedOn);
                     state = state with { OutputPath = migrated };
                     await WriteAtomicAsync(statePath, JsonSerializer.Serialize(state), token);
                 }
@@ -62,7 +65,7 @@ public sealed class RecordingPostProcessor(HttpClient http, Func<string, Cancell
                 progress("LLM özeti hazırlanıyor · " + name);
                 // A manually chosen name can also be returned by another recording's LLM.
                 // Its existing summary is not our cache; only our checkpoint owns a draft.
-                string? cachedSummary = useRecordingName ? null : File.Exists(fallback) ? fallback : File.Exists(previousFallback) ? previousFallback : File.Exists(legacyFallback) ? legacyFallback : null;
+                string? cachedSummary = useRecordingName ? null : File.Exists(fallback) ? fallback : File.Exists(previousDatedFallback) ? previousDatedFallback : File.Exists(previousFallback) ? previousFallback : File.Exists(legacyFallback) ? legacyFallback : null;
                 string summary = cachedSummary != null ? await File.ReadAllTextAsync(cachedSummary, token) : await CallLlmAsync(settings, settings.LlmPrompt, text, token);
                 state = new SummaryState(summary);
                 await WriteAtomicAsync(statePath, JsonSerializer.Serialize(state), token);
@@ -71,7 +74,7 @@ public sealed class RecordingPostProcessor(HttpClient http, Func<string, Cancell
             {
                 // The recording already owns this name. Keep audio, transcript and summary paired
                 // and never send the summary back to the model merely to obtain another title.
-                string namedOutput = await SummaryFileNames.WriteUniqueAsync(settings.SummaryFolder, name, state.Summary, token, preserveRecordingName: true, recordedOn: recordedOn);
+                string namedOutput = await SummaryFileNames.WriteUniqueAsync(summaryFolder, name, state.Summary, token, preserveRecordingName: true, recordedOn: recordedOn);
                 state = state with { Title = name, OutputPath = namedOutput };
                 await WriteAtomicAsync(statePath, JsonSerializer.Serialize(state), token);
                 progress("Özet kaydedildi: " + namedOutput); return;
@@ -92,7 +95,7 @@ public sealed class RecordingPostProcessor(HttpClient http, Func<string, Cancell
                     throw new IOException("Özet korundu; dosya adı alınamadı. Bekleyen işlemi yeniden deneyin. Özet: " + fallback, ex);
                 }
             }
-            string output = await SummaryFileNames.WriteUniqueAsync(settings.SummaryFolder, state.Title, state.Summary, token, recordedOn: recordedOn);
+            string output = await SummaryFileNames.WriteUniqueAsync(summaryFolder, state.Title, state.Summary, token, recordedOn: recordedOn);
             state = state with { OutputPath = output };
             await WriteAtomicAsync(statePath, JsonSerializer.Serialize(state), token);
             if (!string.Equals(fallback, output, StringComparison.OrdinalIgnoreCase)) File.Delete(fallback);
