@@ -1,6 +1,7 @@
 namespace SesKayit.Core;
 
-public sealed record ObservedDevice(string Id, string Name, bool Microphone, bool CommunicationDefault, bool UsedByOtherApp);
+public sealed record ObservedDevice(string Id, string Name, bool Microphone, bool CommunicationDefault, bool UsedByOtherApp,
+    bool PlaybackDefault = false, float PlaybackPeak = 0, string FormatSignature = "");
 
 public static class AutomaticSources
 {

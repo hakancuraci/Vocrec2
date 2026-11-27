@@ -13,7 +13,7 @@ public sealed partial class MainForm
     private readonly Label processingSaveState = LabelText("URL boşsa yalnızca metin oluşturulur.", 8);
     private readonly StudioButton saveProcessing = MakeButton("Ayarları kaydet");
     private string PendingDirectory => Path.Combine(Path.GetDirectoryName(settingsPath)!, "pending");
-    private sealed record PendingJob(string Audio, PostProcessingSettings Settings, bool UseRecordingName = false);
+    private sealed record PendingJob(string Audio, PostProcessingSettings Settings, bool UseRecordingName = false, string CaptureWarning = "");
     private Task processingTask => processingQueue.Completion;
     internal Task ProcessingCompletion => processingTask;
 
@@ -293,14 +293,14 @@ public sealed partial class MainForm
             try
             {
                 var job = System.Text.Json.JsonSerializer.Deserialize<PendingJob>(File.ReadAllText(path));
-                if (job != null && File.Exists(job.Audio)) QueueProcessing(job.Audio, useCurrentSettings ? settings.Processing : job.Settings, job.UseRecordingName);
+                if (job != null && File.Exists(job.Audio)) QueueProcessing(job.Audio, useCurrentSettings ? settings.Processing : job.Settings, job.UseRecordingName, job.CaptureWarning);
             }
             catch (Exception ex) when (ex is IOException or System.Text.Json.JsonException or UnauthorizedAccessException)
             { status.Text = "Bekleyen işlem okunamadı: " + ex.Message; }
         }
     }
 
-    private void QueueProcessing(string file, PostProcessingSettings value, bool useRecordingName = false)
+    private void QueueProcessing(string file, PostProcessingSettings value, bool useRecordingName = false, string captureWarning = "")
     {
         string id = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(Path.GetFullPath(file))));
         if (processingQueue.Snapshot().Any(j => j.Id == id && j.Status is ProcessingStatus.Queued or ProcessingStatus.Running or ProcessingStatus.Completed)) return;
@@ -308,10 +308,10 @@ public sealed partial class MainForm
         {
             Directory.CreateDirectory(PendingDirectory);
             string pending = Path.Combine(PendingDirectory, id + ".json");
-            File.WriteAllText(pending + ".tmp", System.Text.Json.JsonSerializer.Serialize(new PendingJob(file, value, useRecordingName)));
+            File.WriteAllText(pending + ".tmp", System.Text.Json.JsonSerializer.Serialize(new PendingJob(file, value, useRecordingName, captureWarning)));
             File.Move(pending + ".tmp", pending, true);
             processingQueue.Enqueue(new ProcessingJob { Id = id, Sources = [file], Kind = ProcessingKind.Recording,
-                Settings = value, UseRecordingName = useRecordingName, Profile = profileName.Text, RecordedOn = RecordingDates.FromAudio(file) });
+                Settings = value, UseRecordingName = useRecordingName, Profile = profileName.Text, RecordedOn = RecordingDates.FromAudio(file), CaptureWarning = captureWarning });
             RefreshProcessingIndicator();
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -331,6 +331,7 @@ public sealed partial class MainForm
         {
             if (job.Kind == ProcessingKind.Recording)
             {
+                if (!string.IsNullOrEmpty(job.CaptureWarning)) throw new IOException(job.CaptureWarning);
                 await processRecording(job.Sources[0], job.Settings, Report, job.UseRecordingName);
                 string pending = Path.Combine(PendingDirectory, job.Id + ".json");
                 if (File.Exists(pending)) File.Delete(pending);

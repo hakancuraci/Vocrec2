@@ -15,6 +15,8 @@ public sealed partial class MainForm : Form
     private readonly System.Windows.Forms.Timer discoveryTimer = new() { Interval = 1000 };
     private bool refreshingDevices, refreshingActivity, devicesLoaded, updatingDevices;
     private Task<ObservedDevice[]>? deviceRead;
+    private ObservedDevice[] endpointSnapshot = [];
+    private string? playbackDefaultId;
     private readonly Func<Task<ObservedDevice[]>> readDevices;
     private readonly Func<Task<ActivitySnapshot>> readActivity;
     private readonly Func<RecordingRequest, IRecordingSession> createRecording;
@@ -78,8 +80,8 @@ public sealed partial class MainForm : Form
         LoadSettings();
         refresh.Click += async (_, _) => await RefreshChannelsAsync();
         automatic.CheckedChanged += async (_, _) => await ChangeAutomaticModeAsync();
-        outputs.ItemChecksChanged += (_, _) => SourceSelectionChanged();
-        microphones.ItemChecksChanged += (_, _) => SourceSelectionChanged();
+        outputs.ItemChecksChanged += (_, _) => SourceSelectionChanged(outputSelection: true);
+        microphones.ItemChecksChanged += (_, _) => SourceSelectionChanged(outputSelection: false);
         discoveryTimer.Tick += async (_, _) => await RefreshChannelsAsync();
         open.Click += (_, _) => { try { var path = folder.Text; Directory.CreateDirectory(path); Process.Start(new ProcessStartInfo(path) { UseShellExecute = true }); } catch (Exception ex) { ShowError(ex); } };
         start.Click += async (_, _) => await StartAsync();
@@ -120,6 +122,8 @@ public sealed partial class MainForm : Form
         bool limited = Interlocked.Read(ref current.Mixer.LimitedSamples) > 0;
         peakInfo.Text = limited ? "Tepe sınırına ulaşıldı. Daha temiz ses için seviyeleri azaltın." : "Kayıt sürüyor · seviyeleri canlı ayarlayabilirsiniz.";
         peakInfo.ForeColor = limited ? Color.FromArgb(255, 196, 110) : Color.Silver;
+        if (systemGain.Value == 0 && endpointSnapshot.Any(d => !d.Microphone && d.PlaybackPeak > 0.001f))
+        { peakInfo.Text = "Bilgisayar sesi seviyesi %0 · sesi kaydetmek için yükseltin."; peakInfo.ForeColor = Color.FromArgb(255, 196, 110); }
         if (current.Completion.IsCompleted) await StopAsync();
         else if (current.CaptureError != null) await RefreshChannelsAsync();
     }
@@ -138,7 +142,7 @@ public sealed partial class MainForm : Form
         {
             // Keep this click pending only for endpoint enumeration, never for application scans.
             // If endpoints are already displayed, start immediately even during a refresh.
-            if (!devicesLoaded) ApplyDevices(await ReadDevicesAsync());
+            if (!devicesLoaded || deviceRead?.IsCompleted == true) ApplyDevices(await ReadDevicesAsync(refresh: true));
             var selected = SelectedSources();
             if (selected.Length == 0) throw new InvalidOperationException("Kaydedilecek ses kaynağı yok. Bir ses çıkışı veya mikrofon bağlayın ya da elle kaynak seçin.");
             SaveSettings();
@@ -156,6 +160,7 @@ public sealed partial class MainForm : Form
         string? chosenName = RecordingFileNames.Normalize(recordingName.Text);
         busy = true; recordingName.Enabled = false; timer.Stop(); stop.Enabled = false; status.Text = "Dosya tamamlanıyor…";
         var current = session;
+        string captureWarning = "";
         try { await current.StopAsync(); lastFile = current.OutputPath; status.Text = "Kaydedildi: " + Path.GetFileName(lastFile); }
         catch (Exception ex)
         {
@@ -163,7 +168,12 @@ public sealed partial class MainForm : Form
             status.Text = "Kayıt hatayla durdu.";
             ShowError(new IOException(ex.Message + (lastFile is null ? $"\nKısmi dosya (tamamlanmamış olabilir):\n{current.PartialPath}" : ""), ex));
         }
-        finally { DisplayDuration(current.Mixer.Duration); current.Dispose(); session = null; busy = false; recordingName.Enabled = true; SetRecording(false); systemMeter.Value = micMeter.Value = 0; SaveSettings(); }
+        finally
+        {
+            if (current.Mixer.Duration >= TimeSpan.FromSeconds(5) && Interlocked.Read(ref current.Mixer.NonSilentSamples) == 0)
+                captureWarning = "Kayıt dosyası korundu ancak kaydedilen ses tamamen sessiz. Kulaklık çıkışını ve ses seviyelerini kontrol edin; STT/LLM başlatılmadı.";
+            DisplayDuration(current.Mixer.Duration); current.Dispose(); session = null; busy = false; recordingName.Enabled = true; SetRecording(false); systemMeter.Value = micMeter.Value = 0; SaveSettings();
+        }
         if (lastFile != null && File.Exists(lastFile))
         {
             if (chosenName != null)
@@ -176,7 +186,8 @@ public sealed partial class MainForm : Form
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
                 { ShowError(new IOException("Kayıt adı değiştirilemedi; ses özgün adıyla korundu: " + lastFile, ex)); }
             }
-            QueueProcessing(lastFile, settings.Processing, useRecordingName: chosenName != null);
+            QueueProcessing(lastFile, settings.Processing, useRecordingName: chosenName != null, captureWarning: captureWarning);
+            if (captureWarning.Length > 0) status.Text = captureWarning;
             recordingName.Clear();
         }
     }
@@ -193,8 +204,25 @@ public sealed partial class MainForm : Form
         try
         {
             var chosen = AutomaticSources.Select(devices);
-            UpdateDevices(outputs, devices.Where(d => !d.Microphone), chosen);
+            string? nextDefault = devices.FirstOrDefault(d => !d.Microphone && d.PlaybackDefault)?.Id;
+            HashSet<string>? manualOutputIds = null;
+            if (!automatic.Checked && settings.FollowDefaultPlayback)
+            {
+                manualOutputIds = outputs.CheckedItems.Cast<DeviceChoice>().Select(d => d.Id).ToHashSet();
+                if (!devicesLoaded) manualOutputIds.UnionWith(settings.Devices);
+                bool follow = manualOutputIds.Contains(playbackDefaultId ?? "") || (!devicesLoaded &&
+                    (settings.Devices.Length == 0 || manualOutputIds.Contains(nextDefault ?? ""))) || pendingDefaultFollow;
+                if (follow && nextDefault != null)
+                {
+                    if (playbackDefaultId != nextDefault) manualOutputIds.Remove(playbackDefaultId ?? "");
+                    manualOutputIds.Add(nextDefault);
+                }
+                pendingDefaultFollow = follow;
+            }
+            endpointSnapshot = devices;
+            UpdateDevices(outputs, devices.Where(d => !d.Microphone), chosen, manualOutputIds);
             UpdateDevices(microphones, devices.Where(d => d.Microphone), chosen);
+            playbackDefaultId = nextDefault ?? playbackDefaultId;
             devicesLoaded = true;
         }
         finally { updatingDevices = false; }
@@ -205,6 +233,7 @@ public sealed partial class MainForm : Form
         if (busy || IsDisposed) return;
         if (automatic.Checked)
         {
+            settings.FollowDefaultPlayback = true; pendingDefaultFollow = true;
             updatingDevices = true;
             try
             {
@@ -217,9 +246,11 @@ public sealed partial class MainForm : Form
         await RefreshChannelsAsync();
     }
 
-    private void SourceSelectionChanged()
+    private bool pendingDefaultFollow;
+    private void SourceSelectionChanged(bool outputSelection)
     {
         if (updatingDevices || busy || IsDisposed) return;
+        if (outputSelection) { settings.FollowDefaultPlayback = false; pendingDefaultFollow = false; }
         // Explicit selection takes precedence over automatic discovery on later scans.
         if (automatic.Checked) { automatic.Checked = false; return; }
         SynchronizeRecordingSources(); SaveSettings();
@@ -236,6 +267,11 @@ public sealed partial class MainForm : Form
             status.Text = current.Warning ?? (current.Inputs.Length == 0
                 ? "● Kayıt sürüyor · kaynak seçilene kadar sessizlik kaydediliyor"
                 : $"● {(automatic.Checked ? "Otomatik" : "Elle")} kayıt · {current.Inputs.Length} kaynak");
+            var selectedIds = SelectedSources().Select(d => d.Id).ToHashSet();
+            var audibleDefault = endpointSnapshot.Where(d => !d.Microphone && d.PlaybackPeak > 0.001f && !selectedIds.Contains(d.Id))
+                .OrderByDescending(d => d.PlaybackDefault).FirstOrDefault();
+            if (audibleDefault != null && !SelectedSources().Any(d => d.Id == audibleDefault.Id))
+                status.Text = "Windows sesi " + audibleDefault.Name + " çıkışında. Kaydetmek için bu çıkışı seçin veya otomatik keşfi açın.";
         }
         catch (Exception ex) { status.Text = "Kaynak değiştirilemedi; kayıt sürüyor: " + ex.Message; }
     }
@@ -280,14 +316,19 @@ public sealed partial class MainForm : Form
     }
 
     private DeviceChoice[] SelectedSources() => outputs.CheckedItems.Cast<DeviceChoice>()
-        .Concat(microphones.CheckedItems.Cast<DeviceChoice>()).ToArray();
+        .Concat(microphones.CheckedItems.Cast<DeviceChoice>()).Select(choice =>
+        {
+            var observed = endpointSnapshot.FirstOrDefault(d => d.Id == choice.Id);
+            return choice with { PlaybackPeak = observed?.PlaybackPeak ?? 0, FormatSignature = observed?.FormatSignature ?? "" };
+        }).ToArray();
 
-    private void UpdateDevices(DevicePicker list, IEnumerable<ObservedDevice> observed, HashSet<string> automaticIds)
+    private void UpdateDevices(DevicePicker list, IEnumerable<ObservedDevice> observed, HashSet<string> automaticIds, HashSet<string>? manualIds = null)
     {
         var previous = list.CheckedItems.Cast<DeviceChoice>().Select(d => d.Id).ToHashSet();
         if (!devicesLoaded) previous.UnionWith(settings.Devices);
+        if (manualIds != null && devicesLoaded) previous = manualIds;
         var choices = observed.Select(d => new DeviceChoice(d.Id,
-            d.Name + (d.CommunicationDefault ? "  (iletişim varsayılanı)" : ""), d.Microphone)).ToArray();
+            d.Name + (d.PlaybackDefault ? "  (Windows ses çıkışı)" : d.CommunicationDefault ? "  (iletişim varsayılanı)" : ""), d.Microphone)).ToArray();
         if (!devicesLoaded && settings.Devices.Length == 0) previous.UnionWith(choices.Select(c => c.Id));
         if (emptySources.TryGetValue(list, out var empty)) { empty.Visible = choices.Length == 0; list.Visible = choices.Length > 0; }
         var old = list.Items.Cast<DeviceChoice>().ToArray();
@@ -362,6 +403,7 @@ public sealed partial class MainForm : Form
         public List<LlmProfile> LlmProfiles { get; set; } = [];
         public string SelectedLlmProfileId { get; set; } = "";
         public bool Automatic { get; set; } = true;
+        public bool FollowDefaultPlayback { get; set; } = true;
         public string Folder { get; set; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyMusic), "SesKayit");
         public int Quality { get; set; } = 1;
         public int? Bitrate { get; set; }

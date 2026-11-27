@@ -65,3 +65,10 @@ Vocrec2 doğrulama
   otomatik kayıtları ve elle özetleri birlikte işler; hata sonrasında devam eder.
 - Çoklu MD/ses seçimi, bölüm sırası, ayrı/tek özet, güncel promptla yeni
   çalışma, ses bazlı STT önbelleği ve yeniden açılışta devam testleri eklendi.
+
+- Kulaklık/jak için aynı cihaz kimliğinde bildirimle kanal yenileme, biçim
+  değişikliği ve Windows ölçeri-sessiz loopback karşılaştırması eklendi.
+- Mikrofonu elle seçerken varsayılan çıkışın değişmesi takip edilir; açıkça
+  elle seçilmiş çıkışlar korunur. Tam dijital sessizlik STT/LLM'ye gönderilmez.
+- Testler fiziksel kulaklık içermez; gerçek oturum sınıfı, enjekte edilmiş
+  ses kaynakları/kodlayıcı ile kanal yenileme ve sayaç sürekliliği için sınanır.

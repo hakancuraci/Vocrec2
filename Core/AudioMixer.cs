@@ -27,6 +27,7 @@ public sealed class AudioMixer : IWaveProvider, IDisposable
     public float MicrophoneGain = 0.7f;
     public float OutputPeak;
     public long LimitedSamples;
+    public long NonSilentSamples;
     public TimeSpan Duration => TimeSpan.FromSeconds(Interlocked.Read(ref frames) / (double)Rate);
 
     public AudioMixer(IEnumerable<MixerInput> inputs)
@@ -91,14 +92,17 @@ public sealed class AudioMixer : IWaveProvider, IDisposable
             Volatile.Write(ref input.Peak, peak);
         }
         float outputPeak = 0;
+        int nonSilent = 0;
         for (int n = 0; n < samples; n++)
         {
             if (Math.Abs(sum[n]) > 0.98f) Interlocked.Increment(ref LimitedSamples);
             // Hard safety ceiling; use the meters/gains to avoid sustained limiting.
             sum[n] = Math.Clamp(sum[n], -0.98f, 0.98f);
+            if (Math.Abs(sum[n]) >= 0.5f / 32767) nonSilent++;
             outputPeak = Math.Max(outputPeak, Math.Abs(sum[n]));
         }
         Volatile.Write(ref OutputPeak, outputPeak);
+        Interlocked.Add(ref NonSilentSamples, nonSilent);
     }
 
     public void Finish() => ended.Set();

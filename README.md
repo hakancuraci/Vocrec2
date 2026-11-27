@@ -54,9 +54,17 @@ Birleşik özet, seçilen ilk bölümün kayıt gününe ait klasöre yazılır.
 
 ## Kayıt sırasında kaynak değiştirme
 
-**Otomatik kanal keşfi** kayıt sürerken açılıp kapatılabilir. Bilgisayar sesi veya mikrofon listesindeki işaretleri doğrudan değiştirerek bir kaynağı ekleyebilir veya kaldırabilirsiniz. Elle seçim yaptığınızda otomatik keşif kapanır; sonraki tarama kaldırdığınız mikrofonu yeniden seçmez. Otomatik keşfi tekrar açmak mevcut tüm kaynakları seçer ve yeni bağlanan cihazları izler. Elle modda yeni cihaz listede görünür; kayda eklemek için işaretleyin.
+**Otomatik kanal keşfi** kayıt sürerken açılıp kapatılabilir. Bilgisayar sesi veya mikrofon listesindeki işaretleri doğrudan değiştirerek bir kaynağı ekleyebilir veya kaldırabilirsiniz. Elle seçim yaptığınızda otomatik keşif kapanır; sonraki tarama kaldırdığınız mikrofonu yeniden seçmez. Otomatik keşfi tekrar açmak mevcut tüm kaynakları seçer ve yeni bağlanan cihazları izler. Mikrofonu elle seçmek Windows varsayılan ses çıkışının takibini kapatmaz: seçili varsayılan çıkış kulaklığa geçtiğinde yeni çıkış izlenir. Bilgisayar sesi listesini özellikle elle değiştirirseniz bu tercih korunur; diğer yeni çıkışları kendiniz işaretlersiniz. Otomatik keşfi yeniden açmak varsayılan çıkış takibini de geri açar.
 
 Değişiklik aynı `.m4a` kaydı içinde uygulanır; sayaç ve kodlayıcı yeniden başlatılmaz. Tüm kaynakları kaldırırsanız kaynak yeniden seçilene kadar sessizlik kaydedilir. Açılmayan yeni bir cihaz uyarı olarak gösterilir; çalışan diğer kaynakların kaydı devam eder. Kayıt hazırlanırken veya bitirilirken kaynak kontrolleri kısa süre kilitlenir.
+
+## Kulaklık takma ve sessiz kanal denetimi
+
+Windows çoklu ortam varsayılan çıkışı, iletişim cihazından ayrı olarak okunur ve **Windows ses çıkışı** etiketiyle gösterilir. 3,5 mm jak geçişinde cihaz kimliği aynı kalsa bile Windows'un varsayılan cihaz, jak ve biçim değişikliği bildirimleri izlenir; ilgili WASAPI kanalı yeniden açılır. Ses biçimi değişiklikleri de karşılaştırılır. Kodlayıcı, dosya ve kayıt sayacı korunur; kanalı yeniden açma sırasında kısa bir geçiş aralığı olabilir.
+
+Windows'un çıkış ölçeri ses gösterirken loopback kanalından birkaç ölçüm boyunca ses gelmezse yalnız ilgili çıkış yeniden bağlanır. Gerçek sessizlik veya uygulamanın ses seviyesini sıfıra indirmek tek başına kanalın tekrar tekrar açılmasına neden olmaz. Elle seçilmemiş bir çıkışta ses varsa alt durum satırı hangi çıkışın seçilmesi gerektiğini gösterir. Bilgisayar sesi seviyesi %0 iken Windows ses çalıyorsa seviye uyarısı görünür.
+
+En az beş saniyelik kayıtta karıştırıcıya yazılan tüm ses örnekleri dijital sessizlikse ses dosyası korunur; otomatik STT/LLM başlatılmaz ve işlem geçmişinde açıklayıcı hata gösterilir. Bu kontrol fiziksel ses kalitesinin veya konuşma anlaşılabilirliğinin ölçümü değildir.
 
 ## Günlük özet klasörleri
 

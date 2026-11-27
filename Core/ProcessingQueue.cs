@@ -16,6 +16,7 @@ public sealed record ProcessingJob
     public string Profile { get; init; } = "";
     public string Title { get; init; } = "";
     public bool UseRecordingName { get; init; }
+    public string CaptureWarning { get; init; } = "";
     public DateOnly RecordedOn { get; init; }
     public ProcessingStatus Status { get; init; } = ProcessingStatus.Queued;
     public string Phase { get; init; } = "Kuyrukta";

@@ -644,6 +644,72 @@ public class RecordingStartTests
         finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
     });
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public Task SelectingOneMicDoesNotLosePlaybackWhenHeadphonesReplaceTheDefaultOutput(bool sameEndpointId) => OnUiThread(async () =>
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "vocrec-jack-" + Guid.NewGuid().ToString("N"));
+        ObservedDevice[] available = [new("realtek", "Hoparlör", false, false, false, PlaybackDefault: true, FormatSignature: "48000-stereo"), .. Devices.Where(d => d.Microphone)];
+        FakeSession? recording = null;
+        using var form = new MainForm(() => Task.FromResult(available), () => Task.FromResult(EmptyActivity), request => recording = new FakeSession(request), Path.Combine(directory, "settings.json"));
+        try
+        {
+            await form.StartAsync();
+            var mic = (DevicePicker)Descendants(form).Single(c => c.AccessibleName == "Mikrofonlar kaynakları");
+            mic.SetItemChecked(1, false);
+            string headphoneId = sameEndpointId ? "realtek" : "headphones";
+            available = [new(headphoneId, "Kulaklık", false, false, false, PlaybackDefault: true, PlaybackPeak: 0.5f, FormatSignature: "44100-stereo"), .. Devices.Where(d => d.Microphone)];
+            await form.RefreshChannelsAsync();
+            Assert.Contains(headphoneId, recording!.SourceHistory.Last());
+            Assert.DoesNotContain("idle-usb-mic", recording.SourceHistory.Last());
+            var output = recording.LastChoices.Single(c => !c.Microphone);
+            Assert.Equal(0.5f, output.PlaybackPeak); Assert.Equal("44100-stereo", output.FormatSignature);
+            Assert.False(recording.Completion.IsCompleted); await form.StopAsync();
+        }
+        finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
+    });
+
+    [Fact]
+    public Task ExplicitOutputSelectionIsKeptAndAnAudibleUnselectedHeadphoneIsShownAsAWarning() => OnUiThread(async () =>
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "vocrec-explicit-output-" + Guid.NewGuid().ToString("N"));
+        ObservedDevice[] available = [new("realtek", "Hoparlör", false, false, false, PlaybackDefault: true), new("hdmi", "HDMI", false, false, false)];
+        FakeSession? recording = null;
+        using var form = new MainForm(() => Task.FromResult(available), () => Task.FromResult(EmptyActivity), request => recording = new FakeSession(request), Path.Combine(directory, "settings.json"));
+        try
+        {
+            await form.StartAsync();
+            var outputs = (DevicePicker)Descendants(form).Single(c => c.AccessibleName == "Bilgisayar sesi kaynakları"); outputs.SetItemChecked(0, false);
+            available = [new("headphones", "Kulaklık", false, false, false, PlaybackDefault: true, PlaybackPeak: 0.4f), new("hdmi", "HDMI", false, false, false)];
+            await form.RefreshChannelsAsync();
+            Assert.Equal(new[] { "hdmi" }, recording!.SourceHistory.Last());
+            Assert.Contains(Descendants(form).OfType<Label>(), label => label.Text.Contains("Windows sesi Kulaklık", StringComparison.Ordinal));
+            await form.StopAsync();
+        }
+        finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
+    });
+
+    [Fact]
+    public Task ACompletelySilentRecordingIsPreservedAndReportedInsteadOfBeingSentToSttOrLlm() => OnUiThread(async () =>
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "vocrec-silent-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(directory);
+        string file = Path.Combine(directory, "settings.json"); File.WriteAllText(file, System.Text.Json.JsonSerializer.Serialize(new { Folder = directory }));
+        FakeSession? recording = null; int processed = 0;
+        using var form = new MainForm(() => Task.FromResult(Devices), () => Task.FromResult(EmptyActivity), request => recording = new FakeSession(request), file,
+            processRecording: (_, _, _, _) => { processed++; return Task.CompletedTask; });
+        try
+        {
+            await form.StartAsync();
+            await Task.Run(() => { byte[] pcm = new byte[48000 * 4 * 5]; Assert.Equal(pcm.Length, recording!.Mixer.Read(pcm, 0, pcm.Length)); });
+            File.WriteAllText(recording!.OutputPath, "fake audio file representing recorded digital silence");
+            await form.StopAsync(); await form.ProcessingCompletion.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.Equal(0, processed); Assert.True(File.Exists(recording.OutputPath));
+            var job = Assert.Single(form.ProcessingHistory); Assert.Equal(ProcessingStatus.Failed, job.Status); Assert.Contains("sessiz", job.Error);
+        }
+        finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
+    });
+
     private static IEnumerable<Control> Descendants(Control parent)
     {
         foreach (Control child in parent.Controls)
@@ -697,9 +763,10 @@ public class RecordingStartTests
         public Exception? CaptureError => null;
         public string? Warning => null;
         public List<string[]> SourceHistory { get; } = [];
+        public DeviceChoice[] LastChoices { get; private set; } = [];
         public void SyncSources(IEnumerable<DeviceChoice> choices)
         {
-            var selected = choices.ToArray(); SourceHistory.Add(selected.Select(c => c.Id).ToArray());
+            var selected = choices.ToArray(); LastChoices = selected; SourceHistory.Add(selected.Select(c => c.Id).ToArray());
             Mixer.SetInputs(selected.Select(c => new MixerInput(new Silence(), c.Microphone)));
         }
         public Task StopAsync() { Mixer.Finish(); completion.TrySetResult(); return Task.CompletedTask; }
